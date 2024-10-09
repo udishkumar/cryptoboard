@@ -48,11 +48,6 @@ function extractHostname(url) {
     return hostnameParts.length > 2 ? hostnameParts[hostnameParts.length - 2] : hostnameParts[0];
 }
 
-// Function to check if an article already exists in the database
-function isArticleNew(existingArticles, newArticle) {
-    return !existingArticles.some(article => article.url === newArticle.url);
-}
-
 // Function to get Reddit Access Token
 async function getRedditAccessToken() {
     const { TOKEN_URL, CLIENT_ID_SECRET, USERNAME, PASSWORD } = config.REDDIT;
@@ -76,50 +71,85 @@ async function getRedditAccessToken() {
     }
 }
 
+// Helper function to check if an article is new
+function isArticleNew(existingArticles, newArticle) {
+    return !existingArticles.some(existing => existing.title === newArticle.title);
+}
+
+// Function to check if any existing articles have missing fields
+function checkMissingFields(existingArticles, fieldsToCheck) {
+    return existingArticles.some(article =>
+        fieldsToCheck.some(field => !article.hasOwnProperty(field))
+    );
+}
+
 /**
  * The Guardian Business API - Fetches and stores articles from The Guardian
  */
 app.get('/guardian', async (req, res) => {
-    const { GUARDIAN } = config.API_KEYS;
+    const API_KEY = 'c5be12ec-9f2f-4ba2-8e1c-ee89971ab1ed';
     const BASE_URL = 'https://content.guardianapis.com/search';
     const query = 'crypto';
     const pageSize = 200;
-    
+
     try {
+        // Fetch existing articles from MongoDB
         const existingArticles = await guardianCollection.find().toArray();
 
-        const firstPageUrl = `${BASE_URL}?q=${query}&page-size=${pageSize}&page=1&api-key=${GUARDIAN}`;
+        // Fetch the first page to determine total pages
+        const firstPageUrl = `${BASE_URL}?q=${query}&page-size=${pageSize}&page=1&api-key=${API_KEY}`;
         const firstPageResponse = await axios.get(firstPageUrl);
         const totalPages = firstPageResponse.data.response.pages;
 
+        // Generate URLs for all pages
         const urls = [];
         for (let page = 1; page <= totalPages; page++) {
-            const url = `${BASE_URL}?q=${query}&page-size=${pageSize}&page=${page}&api-key=${GUARDIAN}`;
+            const url = `${BASE_URL}?q=${query}&page-size=${pageSize}&page=${page}&api-key=${API_KEY}`;
             urls.push(url);
         }
 
+        // Fetch all pages concurrently
         const fetchPagePromises = urls.map(url => axios.get(url));
         const responses = await Promise.all(fetchPagePromises);
 
+        // Collect all articles from the responses
         const allArticles = responses.flatMap(response => response.data.response.results);
-        console.log(`Total articles fetched: ${allArticles.length}`);
 
-        const newArticles = allArticles
-            .map(article => ({
-                publicationDate: article.webPublicationDate,
-                title: article.webTitle,
-                url: article.webUrl,
-                source: extractHostname(article.webUrl)
-            }))
-            .filter(article => isArticleNew(existingArticles, article));
+        // Map the articles to the required structure
+        const newArticles = allArticles.map(article => ({
+            publicationDate: article.webPublicationDate,
+            title: article.webTitle,
+            url: article.webUrl,
+            source: extractHostname(article.webUrl)
+        }));
 
-        if (newArticles.length) {
-            await guardianCollection.insertMany(newArticles);
-            console.log(`Successfully inserted ${newArticles.length} new Guardian articles into MongoDB.`);
+        // Check if existing articles have missing fields
+        const fieldsToCheck = ['publicationDate', 'title', 'url', 'source'];
+        const isMissingField = checkMissingFields(existingArticles, fieldsToCheck);
+
+        // If fields are missing, remove all existing documents and insert new ones
+        if (isMissingField) {
+            await guardianCollection.deleteMany({});
+            console.log('Existing Guardian articles had missing fields. Removed all documents.');
+
+            if (newArticles.length) {
+                await guardianCollection.insertMany(newArticles);
+                console.log(`Successfully inserted ${newArticles.length} Guardian articles into MongoDB.`);
+            } else {
+                return res.json({ message: 'No articles found from The Guardian API' });
+            }
         } else {
-            console.log('No new Guardian articles found.');
+            // If no fields are missing, update only new articles
+            const newArticlesToInsert = newArticles.filter(article => isArticleNew(existingArticles, article));
+            if (newArticlesToInsert.length) {
+                await guardianCollection.insertMany(newArticlesToInsert);
+                console.log(`Successfully inserted ${newArticlesToInsert.length} new Guardian articles into MongoDB.`);
+            } else {
+                console.log('No new Guardian articles found to add.');
+            }
         }
 
+        // Fetch the updated articles and return them
         const updatedArticles = await guardianCollection.find().toArray();
         res.json(updatedArticles);
 
@@ -133,33 +163,54 @@ app.get('/guardian', async (req, res) => {
  * The New York Times Business API - Fetches and stores articles from NYTimes
  */
 app.get('/nytimes', async (req, res) => {
-    const { NYTIMES } = config.API_KEYS;
+    const API_KEY = 'wCuAbXRh08VZYQ39Bq0ZjcHOhVWtBME3';
     const BASE_URL = 'https://api.nytimes.com/svc/search/v2/articlesearch.json';
     const query = 'crypto';
 
     try {
+        // Fetch existing articles from MongoDB
         const existingArticles = await nytCollection.find().toArray();
 
-        const url = `${BASE_URL}?q=${query}&api-key=${NYTIMES}`;
+        // Fetch articles from NYTimes API
+        const url = `${BASE_URL}?q=${query}&api-key=${API_KEY}`;
         const response = await axios.get(url);
         const articles = response.data.response.docs;
 
-        const newArticles = articles
-            .map(article => ({
-                publicationDate: article.pub_date,
-                title: article.headline.main,
-                url: article.web_url,
-                source: extractHostname(article.web_url)
-            }))
-            .filter(article => isArticleNew(existingArticles, article));
+        // Map the fetched articles to the required structure
+        const newArticles = articles.map(article => ({
+            publicationDate: article.pub_date,
+            title: article.headline.main,
+            url: article.web_url,
+            source: extractHostname(article.web_url)
+        }));
 
-        if (newArticles.length) {
-            await nytCollection.insertMany(newArticles);
-            console.log(`Successfully inserted ${newArticles.length} new NYTimes articles into MongoDB.`);
+        // Check if existing articles have missing fields
+        const fieldsToCheck = ['publicationDate', 'title', 'url', 'source'];
+        const isMissingField = checkMissingFields(existingArticles, fieldsToCheck);
+
+        // If fields are missing, remove all existing documents and insert new ones
+        if (isMissingField) {
+            await nytCollection.deleteMany({});
+            console.log('Existing NYTimes articles had missing fields. Removed all documents.');
+
+            if (newArticles.length) {
+                await nytCollection.insertMany(newArticles);
+                console.log(`Successfully inserted ${newArticles.length} NYTimes articles into MongoDB.`);
+            } else {
+                return res.json({ message: 'No articles found from NYTimes API' });
+            }
         } else {
-            console.log('No new NYTimes articles found.');
+            // If no fields are missing, update only new articles
+            const newArticlesToInsert = newArticles.filter(article => isArticleNew(existingArticles, article));
+            if (newArticlesToInsert.length) {
+                await nytCollection.insertMany(newArticlesToInsert);
+                console.log(`Successfully inserted ${newArticlesToInsert.length} new NYTimes articles into MongoDB.`);
+            } else {
+                console.log('No new NYTimes articles found to add.');
+            }
         }
 
+        // Fetch the updated articles and return them
         const updatedArticles = await nytCollection.find().toArray();
         res.json(updatedArticles);
 
@@ -177,9 +228,13 @@ app.get('/reddit', async (req, res) => {
     const query = 'crypto';
 
     try {
+        // Get Reddit access token
         const accessToken = await getRedditAccessToken();
+
+        // Step 1: Fetch existing articles from MongoDB
         const existingArticles = await redditCollection.find().toArray();
 
+        // Step 2: Fetch posts from Reddit API
         const url = `${BASE_URL}?q=${query}`;
         const response = await axios.get(url, {
             headers: {
@@ -188,26 +243,49 @@ app.get('/reddit', async (req, res) => {
             }
         });
         const posts = response.data.data.children;
-        const totalResults = response.data.data.dist;
+        const totalResults = response.data.data.dist; // Get the total number of results
 
-        const newPosts = posts
-            .map(post => ({
-                reddit: post.data.subreddit_name_prefixed || "",
-                author: post.data.author_fullname || "",
-                title: post.data.title || "",
-                description: post.data.selftext || "",
-                image: post.data.preview?.images?.[0]?.source?.url || "",
-                source: extractHostname(post.data.url)
-            }))
-            .filter(post => isArticleNew(existingArticles, post));
+        // Step 3: Map the fetched posts to the required structure and include the "link" field using "permalink"
+        const newPosts = posts.map(post => ({
+            reddit: post.data.subreddit_name_prefixed || "",
+            author: post.data.author_fullname || "",
+            title: post.data.title || "",
+            description: post.data.selftext || "",
+            image: post.data.preview?.images?.[0]?.source?.url || "",
+            link: `https://www.reddit.com${post.data.permalink}`, // Include permalink as the link field
+            source: extractHostname(post.data.url)
+        }));
 
-        if (newPosts.length) {
-            await redditCollection.insertMany(newPosts);
-            console.log(`Successfully inserted ${newPosts.length} new Reddit articles into MongoDB.`);
+        // Step 4: Check if existing articles have missing fields
+        const fieldsToCheck = ['reddit', 'author', 'title', 'description', 'image', 'link', 'source'];
+        const isMissingField = existingArticles.some(article =>
+            fieldsToCheck.some(field => !article.hasOwnProperty(field))
+        );
+
+        // Step 5: If fields are missing, remove all existing documents and insert the new ones
+        if (isMissingField) {
+            await redditCollection.deleteMany({});
+            console.log('Existing Reddit articles had missing fields. Removed all documents.');
+
+            if (newPosts.length) {
+                await redditCollection.insertMany(newPosts);
+                console.log(`Successfully inserted ${newPosts.length} Reddit articles into MongoDB.`);
+            } else {
+                console.log('No new Reddit articles found.');
+                return res.json({ message: 'No new articles to update from Reddit API' });
+            }
         } else {
-            console.log('No new Reddit articles found.');
+            // Step 6: If no fields are missing, update only new posts
+            const newPostsToInsert = newPosts.filter(post => isArticleNew(existingArticles, post));
+            if (newPostsToInsert.length) {
+                await redditCollection.insertMany(newPostsToInsert);
+                console.log(`Successfully inserted ${newPostsToInsert.length} new Reddit articles into MongoDB.`);
+            } else {
+                console.log('No new Reddit articles found to add.');
+            }
         }
 
+        // Step 7: Fetch the updated posts and return them along with totalResults
         const updatedPosts = await redditCollection.find().toArray();
         res.json({ totalResults, articles: updatedPosts });
 
