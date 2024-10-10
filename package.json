@@ -5,7 +5,11 @@
     "cors": "^2.8.5",
     "express": "^4.21.0",
     "mongodb": "^6.9.0",
+    "natural": "^8.0.1",
+    "node-cache": "^5.1.2",
+    "node-cron": "^3.0.3",
     "puppeteer": "^23.5.0",
+    "sentiment": "^5.0.2",
     "snoowrap": "^1.23.0"
   }
 }

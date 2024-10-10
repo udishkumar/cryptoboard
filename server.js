@@ -3,7 +3,6 @@ const axios = require('axios');
 const cors = require('cors');
 const { MongoClient } = require("mongodb");
 const config = require('./config');
-
 const app = express();
 app.use(express.json());
 app.use(cors());
@@ -16,8 +15,16 @@ const password = encodeURIComponent(config.MONGODB.PASSWORD);
 const clusterHost = config.MONGODB.CLUSTER_HOST;
 const dbName = config.MONGODB.DB_NAME;
 const uri = `mongodb+srv://${username}:${password}@${clusterHost}/?retryWrites=true&w=majority`;
-
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });
+const Sentiment = require('sentiment');
+const sentiment = new Sentiment();
+const natural = require('natural');
+const tokenizer = new natural.WordTokenizer();
+const NodeCache = require('node-cache');
+const cache = new NodeCache({ stdTTL: 3600 }); // Cache for 1 hour
+const cron = require('node-cron');
+
+
 
 let db;
 let guardianCollection;
@@ -37,6 +44,27 @@ client.connect()
         console.error("MongoDB Connection Error:", err);
         process.exit();
     });
+
+
+// Schedule a task to refresh the cache every hour
+cron.schedule('0 * * * *', async () => {
+    console.log('Refreshing cache...');
+
+    try {
+        // Manually refresh the articles data
+        const articlesResponse = await axios.get(`http://localhost:${PORT}/articles`);
+        cache.set('articles', articlesResponse.data);
+
+        // Manually refresh the trending data
+        const trendingResponse = await axios.get(`http://localhost:${PORT}/trending`);
+        const trendingTopics = trendingResponse.data; // Get the trending topics from the response
+        cache.set('trending', trendingTopics);
+
+        console.log('Cache refreshed successfully.');
+    } catch (error) {
+        console.error('Error refreshing cache:', error);
+    }
+});
 
 // Function to extract hostname
 function extractHostname(url) {
@@ -81,6 +109,19 @@ function checkMissingFields(existingArticles, fieldsToCheck) {
     return existingArticles.some(article =>
         fieldsToCheck.some(field => !article.hasOwnProperty(field))
     );
+}
+
+// Function to analyze sentiment
+function analyzeSentiment(text) {
+    const result = sentiment.analyze(text || "");
+    return result.score; // Positive score for positive sentiment, negative for negative sentiment
+}
+
+// Function to extract keywords from text
+function extractKeywords(text) {
+    const stopWords = ['the', 'is', 'in', 'and', 'of', 'to', 'a']; // Basic stop words list
+    const tokens = tokenizer.tokenize(text.toLowerCase());
+    return tokens.filter(word => word.length > 3 && !stopWords.includes(word));
 }
 
 /**
@@ -292,6 +333,90 @@ app.get('/reddit', async (req, res) => {
     } catch (error) {
         console.error("Error fetching Reddit articles:", error);
         res.status(500).json({ message: 'Error fetching Reddit articles' });
+    }
+});
+
+// New endpoint to combine articles from The Guardian, NYTimes, and Reddit
+app.get('/articles', async (req, res) => {
+    const cachedArticles = cache.get('articles');
+    if (cachedArticles) {
+        return res.json(cachedArticles);
+    }
+    try {
+        const guardianArticles = await guardianCollection.find().toArray();
+        const nytArticles = await nytCollection.find().toArray();
+        const redditArticles = await redditCollection.find().toArray();
+
+        // Function to map articles to the unified format with sentiment analysis
+        function mapToUnifiedFormat(article, source) {
+            const sentimentScore = analyzeSentiment(article.title + ' ' + (article.description || ""));
+            return {
+                id: article._id,
+                title: article.title,
+                source: source,
+                publicationDate: article.publicationDate,
+                url: article.url,
+                description: article.description || "",
+                author: article.author || "",
+                image: article.image || "",
+                reddit: article.reddit || "",
+                link: article.link || "",
+                sentiment: sentimentScore // Add sentiment score to the response
+            };
+        }
+
+        const unifiedGuardianArticles = guardianArticles.map(article => mapToUnifiedFormat(article, 'guardian'));
+        const unifiedNytArticles = nytArticles.map(article => mapToUnifiedFormat(article, 'nytimes'));
+        const unifiedRedditArticles = redditArticles.map(article => mapToUnifiedFormat(article, 'reddit'));
+
+        const allCombinedArticles = [
+            ...unifiedGuardianArticles,
+            ...unifiedNytArticles,
+            ...unifiedRedditArticles
+        ];
+
+        // Cache the result before sending the response
+        cache.set('articles', allCombinedArticles);
+        res.json(allCombinedArticles);
+    } catch (error) {
+        console.error("Error fetching combined articles:", error);
+        res.status(500).json({ message: 'Error fetching combined articles' });
+    }
+});
+
+app.get('/trending', async (req, res) => {
+    const cachedTrending = cache.get('trending');
+    if (cachedTrending) {
+        return res.json(cachedTrending);
+    }
+    try {
+        const guardianArticles = await guardianCollection.find().toArray();
+        const nytArticles = await nytCollection.find().toArray();
+        const redditArticles = await redditCollection.find().toArray();
+
+        const allArticles = [...guardianArticles, ...nytArticles, ...redditArticles];
+        const keywordCounts = {};
+
+        // Extract keywords and count occurrences
+        allArticles.forEach(article => {
+            const keywords = extractKeywords(article.title + ' ' + (article.description || ""));
+            keywords.forEach(keyword => {
+                keywordCounts[keyword] = (keywordCounts[keyword] || 0) + 1;
+            });
+        });
+
+        // Sort keywords by frequency
+        const trendingTopics = Object.entries(keywordCounts)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 20) // Get top 20 trending topics
+            .map(([keyword, count]) => ({ keyword, count }));
+
+        // Cache the result before sending the response
+        cache.set('trending', trendingTopics);
+        res.json(trendingTopics);
+    } catch (error) {
+        console.error("Error fetching trending topics:", error);
+        res.status(500).json({ message: 'Error fetching trending topics' });
     }
 });
 
