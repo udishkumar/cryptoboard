@@ -1,0 +1,86 @@
+.container {
+  padding: 20px;
+}
+
+.trending-topics {
+  margin-bottom: 20px;
+}
+
+.topics-list {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.trending-topic {
+  margin: 5px;
+  padding: 8px;
+  background-color: #e74c3c;
+  color: white;
+  border-radius: 20px;
+  cursor: pointer;
+}
+
+.search-section {
+  margin-bottom: 20px;
+}
+
+.articles-section ul {
+  list-style-type: none;
+  padding: 0;
+}
+
+.articles-section li {
+  margin-bottom: 20px;
+  padding: 15px;
+  border-radius: 10px;
+  background-color: #f9f9f9;
+  border-left: 5px solid;
+  transition: all 0.3s ease;
+}
+
+.articles-section li:hover {
+  background-color: #eef2f7;
+}
+
+.pagination-wrapper {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+/* Pagination Styles */
+.MuiPaginationItem-root {
+  font-size: 1rem;
+  margin: 0 4px;
+}
+
+.MuiPaginationItem-rounded {
+  border-radius: 50%; /* Fully rounded buttons */
+}
+
+.MuiPaginationItem-outlined {
+  border: 2px solid #1976d2; /* Outline border color for primary */
+}
+
+.MuiPaginationItem-outlinedPrimary.Mui-selected {
+  background-color: #1976d2;
+  color: white;
+}
+
+.MuiPaginationItem-outlinedSecondary.Mui-selected {
+  background-color: #dc004e;
+  color: white;
+}
+
+.MuiPaginationItem:hover {
+  background-color: rgba(25, 118, 210, 0.08); /* Light hover effect */
+}
+
+.sentiment-chart-section {
+  margin-top: 40px;
+}
+
+.sentiment-chart-section h2 {
+  text-align: center;
+  margin-bottom: 20px;
+}
