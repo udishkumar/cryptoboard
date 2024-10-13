@@ -16,11 +16,12 @@ function App() {
   const [redditPage, setRedditPage] = useState(1);
   const [filteredArticles, setFilteredArticles] = useState([]);
   const ARTICLES_PER_PAGE = 10;
+  const apiUrl = process.env.REACT_APP_API_URL;
 
   useEffect(() => {
     const fetchData = async () => {
-      const articlesRes = await axios.get('http://localhost:8082/articles');
-      const trendingRes = await axios.get('http://localhost:8082/trending');
+      const articlesRes = await axios.get(`${apiUrl}/articles`);
+      const trendingRes = await axios.get(`${apiUrl}/trending`);
       setArticles(articlesRes.data);
       setFilteredArticles(articlesRes.data); // Set initial filtered articles
       setTrendingTopics(trendingRes.data);
