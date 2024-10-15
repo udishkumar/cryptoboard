@@ -25,6 +25,9 @@ const tokenizer = new natural.WordTokenizer();
 const NodeCache = require('node-cache');
 const cache = new NodeCache({ stdTTL: 3600 }); // Cache for 1 hour
 const cron = require('node-cron');
+const CoinGecko = require('coingecko-api');
+const CoinGeckoClient = new CoinGecko();
+
 
 
 
@@ -419,6 +422,33 @@ app.get('/trending', async (req, res) => {
     } catch (error) {
         console.error("Error fetching trending topics:", error);
         res.status(500).json({ message: 'Error fetching trending topics' });
+    }
+});
+
+// New endpoint to get cryptocurrency growth data
+app.get('/crypto-growth', async (req, res) => {
+    try {
+        const { id = 'bitcoin', days = '365', interval = 'daily' } = req.query;
+
+        // Fetch historical market data for the specified cryptocurrency
+        const response = await CoinGeckoClient.coins.fetchMarketChart(id, {
+            days: days,
+            interval: interval,
+        });
+
+        if (response.success) {
+            const prices = response.data.prices; // Array of [timestamp, price]
+            const growthData = prices.map(priceData => ({
+                date: new Date(priceData[0]).toISOString(),
+                price: priceData[1],
+            }));
+            res.json(growthData);
+        } else {
+            res.status(500).json({ message: 'Error fetching data from CoinGecko' });
+        }
+    } catch (error) {
+        console.error('Error fetching cryptocurrency growth data:', error);
+        res.status(500).json({ message: 'Error fetching cryptocurrency growth data' });
     }
 });
 

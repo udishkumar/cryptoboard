@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import Pagination from '@mui/material/Pagination';
-import { Scatter } from 'react-chartjs-2'; // Import Chart.js scatter plot
-import { Chart as ChartJS, Tooltip, Legend, PointElement, LinearScale } from 'chart.js';
+import { Scatter, Line } from 'react-chartjs-2';
+import { Chart as ChartJS, Tooltip, Legend, PointElement, LinearScale, CategoryScale, TimeScale, LineElement } from 'chart.js';
+import 'chartjs-adapter-date-fns'; // Import the date-fns adapter for time scale
+import regression from 'regression';
 import './App.css';
 
-ChartJS.register(Tooltip, Legend, PointElement, LinearScale); // Register required chart.js elements
+// Register required elements
+ChartJS.register(Tooltip, Legend, PointElement, LinearScale, CategoryScale, TimeScale, LineElement);
 
 function App() {
   const [articles, setArticles] = useState([]);
@@ -17,6 +20,8 @@ function App() {
   const [filteredArticles, setFilteredArticles] = useState([]);
   const ARTICLES_PER_PAGE = 10;
   const apiUrl = process.env.REACT_APP_API_URL;
+  const [growthData, setGrowthData] = useState([]);
+  const [projectedData, setProjectedData] = useState([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -27,7 +32,98 @@ function App() {
       setTrendingTopics(trendingRes.data);
     };
     fetchData();
+    
+    const fetchGrowthData = async () => {
+      try {
+        const response = await axios.get(`${apiUrl}/crypto-growth`, {
+          params: {
+            id: 'bitcoin',
+            days: '365',
+            interval: 'daily',
+          },
+        });
+        const data = response.data;
+        
+        // Parse dates correctly
+        const parsedGrowthData = data.map(point => ({
+          date: new Date(point.date), // Ensure the date is a JavaScript Date object
+          price: point.price,
+        }));
+        
+        setGrowthData(parsedGrowthData);
+  
+        // Prepare data for regression
+        const regressionData = parsedGrowthData.map((point, index) => [index, point.price]);
+        const result = regression.linear(regressionData);
+  
+        // Project future values (e.g., next 30 days)
+        const projectedData = [];
+        const lastIndex = regressionData.length - 1;
+        for (let i = 1; i <= 30; i++) {
+          const x = lastIndex + i;
+          const y = result.predict(x)[1];
+          projectedData.push({
+            date: new Date(Date.now() + i * 24 * 60 * 60 * 1000), // Ensure future dates are Date objects
+            price: y
+          });
+        }
+  
+        setProjectedData(projectedData);
+      } catch (error) {
+        console.error('Error fetching growth data:', error);
+      }
+    };
+
+    fetchGrowthData();
   }, []);
+
+  // Prepare data for the growth chart including projections
+  const growthChartData = {
+    labels: [
+      ...growthData.map(data => data.date), 
+      ...projectedData.map(data => data.date)
+    ],
+    datasets: [
+      {
+        label: 'Bitcoin Price (USD)',
+        data: growthData.map(data => data.price),
+        fill: false,
+        borderColor: 'rgb(75, 192, 192)',
+        tension: 0.1,
+      },
+      {
+        label: 'Projected Price (USD)',
+        data: [...new Array(growthData.length).fill(null), ...projectedData.map(data => data.price)],
+        fill: false,
+        borderColor: 'rgb(255, 99, 132)',
+        borderDash: [5, 5],
+        tension: 0.1,
+      },
+    ],
+  };
+
+  const growthChartOptions = {
+    scales: {
+      x: {
+        type: 'time', // Use time scale
+        time: {
+          unit: 'month',
+          tooltipFormat: 'MMM dd, yyyy',
+        },
+        title: {
+          display: true,
+          text: 'Date',
+        },
+      },
+      y: {
+        beginAtZero: false,
+        title: {
+          display: true,
+          text: 'Price (USD)',
+        },
+      },
+    },
+  };
 
   const handleSearchChange = (event) => {
     setSearchTerm(event.target.value);
@@ -74,7 +170,7 @@ function App() {
     return articles.slice(startIndex, startIndex + ARTICLES_PER_PAGE);
   };
 
-  // Prepare chart data
+  // Prepare chart data for sentiment
   const sentimentData = {
     labels: ['Sentiment Scores'],
     datasets: [
@@ -153,6 +249,13 @@ function App() {
   return (
     <div className="container">
       <h1 className="text-center">CryptoBoard</h1>
+
+      {/* Growth Chart Section */}
+      <section className="growth-chart-section">
+        <h2>Cryptocurrency Growth Chart</h2>
+        <Line data={growthChartData} options={growthChartOptions} />
+      </section>
+
       <section className="trending-topics">
         <h2>Trending Topics</h2>
         <div className="topics-list">
@@ -181,7 +284,6 @@ function App() {
           />
         </div>
       </section>
-
 
       {/* Guardian Articles Section */}
       <section className="articles-section">
