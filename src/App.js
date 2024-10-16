@@ -249,7 +249,19 @@ function App() {
   return (
     <div className="container">
       <h1 className="text-center">CryptoBoard</h1>
-
+      <section className="search-section">
+        <div className="mb-3">
+          <label className="form-label">Search Articles:</label>
+          <input
+            type="text"
+            className="form-control"
+            value={searchTerm}
+            onChange={handleSearchChange}
+            placeholder="Enter keywords"
+            aria-label="Search Articles"
+          />
+        </div>
+      </section>
       {/* Growth Chart Section */}
       <section className="growth-chart-section">
         <h2>Cryptocurrency Growth Chart</h2>
@@ -268,20 +280,6 @@ function App() {
               #{topic.keyword} ({topic.count})
             </span>
           ))}
-        </div>
-      </section>
-
-      <section className="search-section">
-        <div className="mb-3">
-          <label className="form-label">Search Articles:</label>
-          <input
-            type="text"
-            className="form-control"
-            value={searchTerm}
-            onChange={handleSearchChange}
-            placeholder="Enter keywords"
-            aria-label="Search Articles"
-          />
         </div>
       </section>
 
