@@ -31,10 +31,6 @@ Follow these steps to build and run the application in Docker:
      ```
      http://localhost:8082
      ```
-   - If you are running this on a cloud server, replace `localhost` with the server's public IP address:
-     ```
-     http://<server-ip>:8082
-     ```
 
 5. **Stopping the Docker Container**:
    - If you need to stop the running container, use the following command:
