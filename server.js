@@ -28,9 +28,6 @@ const cron = require('node-cron');
 const CoinGecko = require('coingecko-api');
 const CoinGeckoClient = new CoinGecko();
 
-
-
-
 let db;
 let guardianCollection;
 let nytCollection;
