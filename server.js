@@ -424,30 +424,35 @@ app.get('/trending', async (req, res) => {
 
 // New endpoint to get cryptocurrency growth data
 app.get('/crypto-growth', async (req, res) => {
-    try {
-        const { id = 'bitcoin', days = '365', interval = 'daily' } = req.query;
+  const {
+    id          = 'bitcoin',
+    vs_currency = 'usd',
+    days        = '365',
+    interval    = 'daily'
+  } = req.query;
 
-        // Fetch historical market data for the specified cryptocurrency
-        const response = await CoinGeckoClient.coins.fetchMarketChart(id, {
-            days: days,
-            interval: interval,
-        });
+  const url = `https://api.coingecko.com/api/v3/coins/${encodeURIComponent(id)}/market_chart`;
+  try {
+    const { data } = await axios.get(url, {
+      params: { vs_currency, days, interval },
+    });
 
-        if (response.success) {
-            const prices = response.data.prices; // Array of [timestamp, price]
-            const growthData = prices.map(priceData => ({
-                date: new Date(priceData[0]).toISOString(),
-                price: priceData[1],
-            }));
-            res.json(growthData);
-        } else {
-            res.status(500).json({ message: 'Error fetching data from CoinGecko' });
-        }
-    } catch (error) {
-        console.error('Error fetching cryptocurrency growth data:', error);
-        res.status(500).json({ message: 'Error fetching cryptocurrency growth data' });
-    }
+    const prices = data.prices || [];
+    const growthData = prices.map(([ts, price]) => ({
+      date:  new Date(ts).toISOString(),
+      price,
+    }));
+
+    return res.json(growthData);
+  } catch (error) {
+    console.error(
+      'Error fetching crypto data via REST:',
+      error.response?.data || error.message
+    );
+    return res.status(500).json({ message: 'Error fetching cryptocurrency growth data' });
+  }
 });
+
 
 // Start the server
 app.listen(PORT, () => {
