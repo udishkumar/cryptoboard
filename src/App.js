@@ -75,7 +75,7 @@ function App() {
     };
 
     fetchGrowthData();
-  }, []);
+  }, [apiUrl]);
 
   // Prepare data for the growth chart including projections
   const growthChartData = {

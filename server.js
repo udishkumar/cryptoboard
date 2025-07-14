@@ -130,7 +130,7 @@ function extractKeywords(text) {
  * The Guardian Business API - Fetches and stores articles from The Guardian
  */
 app.get('/guardian', async (req, res) => {
-    const API_KEY = 'c5be12ec-9f2f-4ba2-8e1c-ee89971ab1ed';
+    const API_KEY = config.API_KEYS.GUARDIAN;
     const BASE_URL = 'https://content.guardianapis.com/search';
     const query = 'crypto';
     const pageSize = 200;
@@ -206,7 +206,7 @@ app.get('/guardian', async (req, res) => {
  * The New York Times Business API - Fetches and stores articles from NYTimes
  */
 app.get('/nytimes', async (req, res) => {
-    const API_KEY = 'wCuAbXRh08VZYQ39Bq0ZjcHOhVWtBME3';
+    const API_KEY = config.API_KEYS.NYTIMES;
     const BASE_URL = 'https://api.nytimes.com/svc/search/v2/articlesearch.json';
     const query = 'crypto';
 
@@ -267,7 +267,7 @@ app.get('/nytimes', async (req, res) => {
  * The Reddit Business API - Fetches and stores posts from Reddit
  */
 app.get('/reddit', async (req, res) => {
-    const BASE_URL = 'https://oauth.reddit.com/search';
+    const BASE_URL = config.REDDIT.BASE_URL;
     const query = 'crypto';
 
     try {

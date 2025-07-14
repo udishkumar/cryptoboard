@@ -23,6 +23,7 @@ module.exports = {
 
     // Reddit configuration
     REDDIT: {
+        BASE_URL: 'https://oauth.reddit.com/search',
         TOKEN_URL: 'https://www.reddit.com/api/v1/access_token',
         CLIENT_ID_SECRET: process.env.REDDIT_CLIENT_ID_SECRET || 'default_client_id_secret',
         USERNAME: process.env.REDDIT_USERNAME || 'default_reddit_username',
