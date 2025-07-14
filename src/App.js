@@ -1,9 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import Pagination from '@mui/material/Pagination';
+import {
+  AppBar,
+  Toolbar,
+  Typography,
+  Container,
+  TextField,
+  Chip,
+  Grid,
+  Card,
+  CardContent,
+  Link,
+  Pagination,
+  Box,
+  CircularProgress,
+  Alert
+} from '@mui/material';
 import { Scatter, Line } from 'react-chartjs-2';
 import { Chart as ChartJS, Tooltip, Legend, PointElement, LinearScale, CategoryScale, TimeScale, LineElement } from 'chart.js';
-import 'chartjs-adapter-date-fns'; // Import the date-fns adapter for time scale
+import 'chartjs-adapter-date-fns';
 import regression from 'regression';
 import './App.css';
 
@@ -18,6 +33,9 @@ function App() {
   const [nytimesPage, setNytimesPage] = useState(1);
   const [redditPage, setRedditPage] = useState(1);
   const [filteredArticles, setFilteredArticles] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
   const ARTICLES_PER_PAGE = 10;
   const apiUrl = process.env.REACT_APP_API_URL;
   const [growthData, setGrowthData] = useState([]);
@@ -25,14 +43,21 @@ function App() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const articlesRes = await axios.get(`${apiUrl}/articles`);
-      const trendingRes = await axios.get(`${apiUrl}/trending`);
-      setArticles(articlesRes.data);
-      setFilteredArticles(articlesRes.data); // Set initial filtered articles
-      setTrendingTopics(trendingRes.data);
+      try {
+        setLoading(true);
+        const articlesRes = await axios.get(`${apiUrl}/articles`);
+        const trendingRes = await axios.get(`${apiUrl}/trending`);
+        setArticles(articlesRes.data);
+        setFilteredArticles(articlesRes.data);
+        setTrendingTopics(trendingRes.data);
+      } catch (err) {
+        setError("Failed to fetch articles or trending topics.");
+        console.error("Error fetching initial data:", err);
+      } finally {
+        setLoading(false);
+      }
     };
-    fetchData();
-    
+
     const fetchGrowthData = async () => {
       try {
         const response = await axios.get(`${apiUrl}/crypto-growth`, {
@@ -43,44 +68,41 @@ function App() {
           },
         });
         const data = response.data;
-        
-        // Parse dates correctly
+
         const parsedGrowthData = data.map(point => ({
-          date: new Date(point.date), // Ensure the date is a JavaScript Date object
+          date: new Date(point.date),
           price: point.price,
         }));
-        
+
         setGrowthData(parsedGrowthData);
-  
-        // Prepare data for regression
+
         const regressionData = parsedGrowthData.map((point, index) => [index, point.price]);
         const result = regression.linear(regressionData);
-  
-        // Project future values (e.g., next 30 days)
+
         const projectedData = [];
         const lastIndex = regressionData.length - 1;
         for (let i = 1; i <= 30; i++) {
           const x = lastIndex + i;
           const y = result.predict(x)[1];
           projectedData.push({
-            date: new Date(Date.now() + i * 24 * 60 * 60 * 1000), // Ensure future dates are Date objects
+            date: new Date(Date.now() + i * 24 * 60 * 60 * 1000),
             price: y
           });
         }
-  
         setProjectedData(projectedData);
       } catch (error) {
         console.error('Error fetching growth data:', error);
+        setError("Failed to fetch cryptocurrency growth data.");
       }
     };
 
+    fetchData();
     fetchGrowthData();
   }, [apiUrl]);
 
-  // Prepare data for the growth chart including projections
   const growthChartData = {
     labels: [
-      ...growthData.map(data => data.date), 
+      ...growthData.map(data => data.date),
       ...projectedData.map(data => data.date)
     ],
     datasets: [
@@ -105,7 +127,7 @@ function App() {
   const growthChartOptions = {
     scales: {
       x: {
-        type: 'time', // Use time scale
+        type: 'time',
         time: {
           unit: 'month',
           tooltipFormat: 'MMM dd, yyyy',
@@ -123,6 +145,8 @@ function App() {
         },
       },
     },
+    responsive: true,
+    maintainAspectRatio: false,
   };
 
   const handleSearchChange = (event) => {
@@ -170,7 +194,6 @@ function App() {
     return articles.slice(startIndex, startIndex + ARTICLES_PER_PAGE);
   };
 
-  // Prepare chart data for sentiment
   const sentimentData = {
     labels: ['Sentiment Scores'],
     datasets: [
@@ -180,10 +203,10 @@ function App() {
           x: index,
           y: article.sentiment,
           backgroundColor: getSentimentColor(article.sentiment),
-          label: article.title, // Use title for the tooltip
+          label: article.title,
         })),
         pointBackgroundColor: articles.filter(a => a.source === 'reddit').map(article => getSentimentColor(article.sentiment)),
-        pointRadius: 5, // Adjust the size of the points
+        pointRadius: 5,
       },
       {
         label: 'NYTimes',
@@ -194,7 +217,7 @@ function App() {
           label: article.title,
         })),
         pointBackgroundColor: articles.filter(a => a.source === 'nytimes').map(article => getSentimentColor(article.sentiment)),
-        pointRadius: 5, // Adjust the size of the points
+        pointRadius: 5,
       },
       {
         label: 'The Guardian',
@@ -205,7 +228,7 @@ function App() {
           label: article.title,
         })),
         pointBackgroundColor: articles.filter(a => a.source === 'guardian').map(article => getSentimentColor(article.sentiment)),
-        pointRadius: 5, // Adjust the size of the points
+        pointRadius: 5,
       }
     ],
   };
@@ -244,126 +267,176 @@ function App() {
         },
       },
     },
+    responsive: true,
+    maintainAspectRatio: false,
   };
 
   return (
-    <div className="container">
-      <h1 className="text-center">CryptoBoard</h1>
-      <section className="search-section">
-        <div className="mb-3">
-          <label className="form-label">Search Articles:</label>
-          <input
-            type="text"
-            className="form-control"
-            value={searchTerm}
-            onChange={handleSearchChange}
-            placeholder="Enter keywords"
-            aria-label="Search Articles"
-          />
-        </div>
-      </section>
-      {/* Growth Chart Section */}
-      <section className="growth-chart-section">
-        <h2>Cryptocurrency Growth Chart</h2>
-        <Line data={growthChartData} options={growthChartOptions} />
-      </section>
+    <>
+      <AppBar position="static" sx={{ backgroundColor: '#2c3e50' }}>
+        <Toolbar>
+          <Typography variant="h5" component="div" sx={{ flexGrow: 1, fontWeight: 'bold' }}>
+            CryptoBoard 🚀
+          </Typography>
+        </Toolbar>
+      </AppBar>
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        {loading && (
+          <Box display="flex" justifyContent="center" alignItems="center" height="200px">
+            <CircularProgress />
+            <Typography variant="h6" sx={{ ml: 2 }}>Loading data...</Typography>
+          </Box>
+        )}
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>
+        )}
+        {!loading && !error && (
+          <>
+            <Box sx={{ mb: 4 }}>
+              <Typography variant="h5" gutterBottom>
+                Search Articles 🔍
+              </Typography>
+              <TextField
+                fullWidth
+                label="Enter keywords"
+                variant="outlined"
+                value={searchTerm}
+                onChange={handleSearchChange}
+                aria-label="Search Articles"
+              />
+            </Box>
 
-      <section className="trending-topics">
-        <h2>Trending Topics</h2>
-        <div className="topics-list">
-          {trendingTopics.map(topic => (
-            <span
-              key={topic.keyword}
-              className="trending-topic"
-              onClick={() => handleTrendingClick(topic)}
-            >
-              #{topic.keyword} ({topic.count})
-            </span>
-          ))}
-        </div>
-      </section>
+            <Box sx={{ mb: 4 }}>
+              <Typography variant="h5" gutterBottom>
+                Cryptocurrency Growth Chart 📈
+              </Typography>
+              <Card variant="outlined">
+                <CardContent>
+                  <Box sx={{ height: 400 }}>
+                    <Line data={growthChartData} options={growthChartOptions} />
+                  </Box>
+                </CardContent>
+              </Card>
+            </Box>
 
-      {/* Guardian Articles Section */}
-      <section className="articles-section">
-        <h2>The Guardian Articles</h2>
-        <ul>
-          {paginateArticles(filteredArticles.filter(a => a.source === 'guardian'), guardianPage).map((article, index) => (
-            <li key={index} style={{ borderLeftColor: getSentimentColor(article.sentiment) }}>
-              <a href={article.url} target="_blank" rel="noopener noreferrer">
-                {article.title}
-              </a>
-            </li>
-          ))}
-        </ul>
-        <div className="pagination-wrapper">
-          <Pagination
-            count={Math.ceil(filteredArticles.filter(a => a.source === 'guardian').length / ARTICLES_PER_PAGE)}
-            page={guardianPage}
-            onChange={handleGuardianPageChange}
-            variant="outlined"
-            shape="rounded"
-            color="primary"
-          />
-        </div>
-      </section>
+            <Box sx={{ mb: 4 }}>
+              <Typography variant="h5" gutterBottom>
+                Trending Topics 🔥
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                {trendingTopics.map(topic => (
+                  <Chip
+                    key={topic.keyword}
+                    label={`#${topic.keyword} (${topic.count})`}
+                    onClick={() => handleTrendingClick(topic)}
+                    color="primary"
+                    clickable
+                    sx={{
+                      backgroundColor: '#e74c3c',
+                      color: 'white',
+                      fontWeight: 'bold',
+                      '&:hover': {
+                        backgroundColor: '#c0392b',
+                      },
+                    }}
+                  />
+                ))}
+              </Box>
+            </Box>
 
-      {/* NYTimes Articles Section */}
-      <section className="articles-section">
-        <h2>NYTimes Articles</h2>
-        <ul>
-          {paginateArticles(filteredArticles.filter(a => a.source === 'nytimes'), nytimesPage).map((article, index) => (
-            <li key={index} style={{ borderLeftColor: getSentimentColor(article.sentiment) }}>
-              <a href={article.url} target="_blank" rel="noopener noreferrer">
-                {article.title}
-              </a>
-            </li>
-          ))}
-        </ul>
-        <div className="pagination-wrapper">
-          <Pagination
-            count={Math.ceil(filteredArticles.filter(a => a.source === 'nytimes').length / ARTICLES_PER_PAGE)}
-            page={nytimesPage}
-            onChange={handleNytimesPageChange}
-            variant="outlined"
-            shape="rounded"
-            color="secondary"
-          />
-        </div>
-      </section>
+            <Grid container spacing={4}>
+              {['guardian', 'nytimes', 'reddit'].map((source) => (
+                <Grid item xs={12} md={6} lg={4} key={source}>
+                  <Box sx={{ mb: 4 }}>
+                    <Typography variant="h5" gutterBottom>
+                      {source === 'guardian' ? 'The Guardian Articles 📰' : source === 'nytimes' ? 'NYTimes Articles 🗞️' : 'Reddit Articles 📢'}
+                    </Typography>
+                    {paginateArticles(filteredArticles.filter(a => a.source === source), source === 'guardian' ? guardianPage : source === 'nytimes' ? nytimesPage : redditPage).length > 0 ? (
+                      <Box>
+                        {paginateArticles(filteredArticles.filter(a => a.source === source), source === 'guardian' ? guardianPage : source === 'nytimes' ? nytimesPage : redditPage).map((article, index) => (
+                          <Card
+                            key={index}
+                            variant="outlined"
+                            sx={{
+                              mb: 2,
+                              borderLeft: `5px solid ${getSentimentColor(article.sentiment)}`,
+                              transition: 'all 0.3s ease-in-out',
+                              '&:hover': {
+                                boxShadow: 3,
+                                transform: 'translateY(-2px)',
+                              },
+                            }}
+                          >
+                            <CardContent>
+                              <Typography variant="body1">
+                                <Link href={article.url || article.link} target="_blank" rel="noopener noreferrer" underline="hover" sx={{ fontWeight: 'bold' }}>
+                                  {article.title}
+                                </Link>
+                              </Typography>
+                            </CardContent>
+                          </Card>
+                        ))}
+                        <Box display="flex" justifyContent="center" mt={3}>
+                          <Pagination
+                            count={Math.ceil(filteredArticles.filter(a => a.source === source).length / ARTICLES_PER_PAGE)}
+                            page={source === 'guardian' ? guardianPage : source === 'nytimes' ? nytimesPage : redditPage}
+                            onChange={source === 'guardian' ? handleGuardianPageChange : source === 'nytimes' ? handleNytimesPageChange : handleRedditPageChange}
+                            variant="text"
+                            shape="rounded"
+                            color="primary"
+                            size="large"
+                            showFirstButton
+                            showLastButton
+                            sx={{
+                              '& .MuiPaginationItem-root': {
+                                fontSize: '1.1rem',
+                                margin: '0 6px',
+                                borderRadius: '8px',
+                                transition: 'background-color 0.3s ease, transform 0.2s ease',
+                                '&:hover': {
+                                  backgroundColor: 'rgba(25, 118, 210, 0.1)',
+                                  transform: 'scale(1.05)',
+                                },
+                              },
+                              '& .MuiPaginationItem-root.Mui-selected': {
+                                backgroundColor: '#1976d2',
+                                color: 'white',
+                                fontWeight: 'bold',
+                                '&:hover': {
+                                  backgroundColor: '#1565c0',
+                                },
+                              },
+                              '& .MuiPaginationItem-ellipsis': {
+                                opacity: 0.7,
+                              },
+                            }}
+                          />
+                        </Box>
+                      </Box>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">No articles found for this source.</Typography>
+                    )}
+                  </Box>
+                </Grid>
+              ))}
+            </Grid>
 
-      {/* Reddit Articles Section */}
-      <section className="articles-section">
-        <h2>Reddit Articles</h2>
-        <ul>
-          {paginateArticles(filteredArticles.filter(a => a.source === 'reddit'), redditPage).map((article, index) => (
-            <li key={index} style={{ borderLeftColor: getSentimentColor(article.sentiment) }}>
-              <a href={article.link} target="_blank" rel="noopener noreferrer">
-                {article.title}
-              </a>
-            </li>
-          ))}
-        </ul>
-        <div className="pagination-wrapper">
-          <Pagination
-            count={Math.ceil(filteredArticles.filter(a => a.source === 'reddit').length / ARTICLES_PER_PAGE)}
-            page={redditPage}
-            onChange={handleRedditPageChange}
-            variant="outlined"
-            shape="rounded"
-            color="primary"
-          />
-        </div>
-      </section>
-
-      {/* Sentiment Chart Section */}
-      <section className="sentiment-chart-section">
-        <h2>Sentiment Chart</h2>
-        <Scatter
-          data={sentimentData}
-          options={sentimentOptions}
-        />
-      </section>
-    </div>
+            <Box sx={{ mt: 4, mb: 4 }}>
+              <Typography variant="h5" gutterBottom>
+                Sentiment Chart 📊
+              </Typography>
+              <Card variant="outlined">
+                <CardContent>
+                  <Box sx={{ height: 500 }}>
+                    <Scatter data={sentimentData} options={sentimentOptions} />
+                  </Box>
+                </CardContent>
+              </Card>
+            </Box>
+          </>
+        )}
+      </Container>
+    </>
   );
 }
 

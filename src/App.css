@@ -1,95 +1,74 @@
-.container {
-  padding: 20px;
-}
-
-.trending-topics {
-  margin-bottom: 20px;
-}
-
-.topics-list {
-  display: flex;
-  flex-wrap: wrap;
-}
-
-.trending-topic {
-  margin: 5px;
-  padding: 8px;
-  background-color: #e74c3c;
-  color: white;
-  border-radius: 20px;
-  cursor: pointer;
-}
-
-.search-section {
-  margin-bottom: 20px;
-}
-
-.articles-section ul {
-  list-style-type: none;
+body {
+  font-family: 'Roboto', sans-serif;
+  background-color: #f0f2f5;
+  margin: 0;
   padding: 0;
+  color: #333;
 }
 
-.articles-section li {
-  margin-bottom: 20px;
-  padding: 15px;
+h1, h2, h3, h4, h5, h6 {
+  color: #2c3e50;
+  font-weight: 600;
+}
+
+/* AppBar specific styles */
+.MuiAppBar-root {
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* General Container styling */
+.MuiContainer-root {
+  background-color: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  padding: 30px;
+}
+
+/* TextField (Search Bar) styling */
+.MuiTextField-root .MuiOutlinedInput-root {
+  border-radius: 8px;
+  background-color: #fdfdfd;
+}
+
+.MuiTextField-root .MuiInputLabel-root {
+  color: #666;
+}
+
+/* Chip (Trending Topics) styling - already inlined in JS for dynamic colors, but keep base styles */
+.MuiChip-root {
+  font-weight: 500;
+}
+
+/* Card styling for sections and articles */
+.MuiCard-root {
   border-radius: 10px;
-  background-color: #f9f9f9;
-  border-left: 5px solid;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
   transition: all 0.3s ease;
 }
 
-.articles-section li:hover {
-  background-color: #eef2f7;
+.MuiCard-root:hover {
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
 }
 
-.pagination-wrapper {
-  display: flex;
-  justify-content: center;
-  margin-top: 20px;
+/* Link styling */
+.MuiLink-root {
+  color: #1976d2;
+  text-decoration: none;
 }
 
-/* Pagination Styles */
-.MuiPaginationItem-root {
-  font-size: 1rem;
-  margin: 0 4px;
+.MuiLink-root:hover {
+  text-decoration: underline;
+  color: #1565c0;
 }
 
-.MuiPaginationItem-rounded {
-  border-radius: 50%; /* Fully rounded buttons */
+/* Pagination general styling - specific styles handled in JS for more control */
+.MuiPagination-root {
+  padding: 10px 0;
 }
 
-.MuiPaginationItem-outlined {
-  border: 2px solid #1976d2; /* Outline border color for primary */
-}
-
-.MuiPaginationItem-outlinedPrimary.Mui-selected {
-  background-color: #1976d2;
-  color: white;
-}
-
-.MuiPaginationItem-outlinedSecondary.Mui-selected {
-  background-color: #dc004e;
-  color: white;
-}
-
-.MuiPaginationItem:hover {
-  background-color: rgba(25, 118, 210, 0.08); /* Light hover effect */
-}
-
-.sentiment-chart-section {
-  margin-top: 40px;
-}
-
-.sentiment-chart-section h2 {
-  text-align: center;
-  margin-bottom: 20px;
-}
-
-.growth-chart-section {
-  margin-top: 40px;
-}
-
-.growth-chart-section h2 {
-  text-align: center;
-  margin-bottom: 20px;
+/* Chart specific styling */
+.MuiCardContent-root > .MuiBox-root {
+  position: relative; /* Needed for chart.js responsive container */
+  height: 100%;
+  width: 100%;
 }
