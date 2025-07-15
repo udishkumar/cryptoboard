@@ -1,70 +1,61 @@
-# Getting Started with Create React App
+# 🚀 CryptoBoard: Your Ultimate Cryptocurrency News & Sentiment Dashboard
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+<img width="1922" height="953" alt="Screenshot 2025-07-15 at 10 46 51 AM" src="https://github.com/user-attachments/assets/7f93f920-401c-4ca9-9f84-6811fd8bdc59" />
 
-## Available Scripts
+*A glimpse of the CryptoBoard dashboard, featuring interactive charts and aggregated news.*
 
-In the project directory, you can run:
+## ✨ Overview
 
-### `npm start`
+**CryptoBoard** is a dynamic web application designed to be your one-stop dashboard for staying informed about the cryptocurrency world. It aggregates real-time news from top sources, analyzes market sentiment, identifies trending topics, and visualizes cryptocurrency growth data. Whether you're a crypto enthusiast, an investor, or just curious, CryptoBoard provides actionable insights at a glance.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+## 🌟 Features
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+* **📰 Multi-Source News Aggregation**: Fetches and displays the latest cryptocurrency-related articles from:
+    * **The Guardian**
+    * **The New York Times**
+    * **Reddit (r/cryptocurrency)**
+* **🧐 Advanced Sentiment Analysis**:
+    * **Categorized Sentiment**: Articles are analyzed for sentiment and categorized into "Strongly Positive," "Positive," "Neutral," "Negative," and "Strongly Negative" for intuitive understanding.
+    * **Sentiment Distribution Pie Charts**: Visualizes the proportion of each sentiment category for articles from Reddit, NYTimes, and The Guardian, allowing for quick comparison of each source's overall tone.
+    * **Detailed Sentiment Scatter Plot (with Jitter & Zoom)**: A refined article-level scatter plot that uses **jittering** to reduce overlap, **colors points by sentiment category** for immediate visual insight, and offers **interactive zoom and pan** functionality to explore dense data points in detail.
+* **🔥 Trending Topics**: Identifies and displays the top 20 most frequently mentioned keywords across all aggregated articles, helping you quickly spot what's buzzing in the crypto space.
+* **📈 Cryptocurrency Growth Chart**: Tracks and projects the price growth of major cryptocurrencies (e.g., Bitcoin), providing historical data and linear regression-based future projections.
+* **🔍 Intuitive Search & Filtering**: Easily search for articles by keywords with autosuggestions and filter news by source.
+* **📄 Pagination**: Efficiently browse through large volumes of articles with built-in pagination for each news source.
+* **🔒 User Authentication (Planned/Partial)**: Includes a foundational backend for user registration and login using JWTs, ready for future expansion into personalized features.
 
-### `npm test`
+## 🛠️ Technologies Used
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+CryptoBoard is built with a robust MERN (MongoDB, Express.js, React.js, Node.js) stack, enhanced with specialized libraries for data analysis and visualization.
 
-### `npm run build`
+### Backend
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+* **Node.js & Express.js**: The powerful runtime environment and web framework for building the API.
+* **MongoDB Atlas**: A cloud-hosted NoSQL database for storing aggregated articles and user data.
+    * **`mongodb` (Native Driver)**: For existing news collection interactions.
+    * **`mongoose`**: For defining schemas and interacting with the `User` model.
+* **`axios`**: Promise-based HTTP client for making API requests to external news sources (Guardian, NYT, Reddit, CoinGecko).
+* **`cors`**: Middleware to enable Cross-Origin Resource Sharing.
+* **`dotenv`**: For managing environment variables securely.
+* **`sentiment`**: A Node.js library for sentiment analysis of text.
+* **`natural`**: A general natural language processing (NLP) library for tasks like tokenization (used for keyword extraction).
+* **`node-cache`**: A caching module for Node.js to improve API response times for frequently requested data.
+* **`node-cron`**: For scheduling automated tasks, such as refreshing cached data hourly.
+* **`coingecko-api`**: A wrapper for the CoinGecko API to fetch cryptocurrency market data.
+* **`bcryptjs`**: For hashing user passwords securely.
+* **`jsonwebtoken` (JWT)**: For generating and verifying authentication tokens.
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+### Frontend
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+* **React.js**: A declarative, component-based JavaScript library for building the user interface.
+* **Material-UI (MUI)**: A comprehensive React UI framework for beautiful and responsive components.
+* **`axios`**: For making HTTP requests to the backend API.
+* **`react-chartjs-2`**: React wrapper for Chart.js, used for rendering interactive data visualizations.
+* **`chart.js`**: Flexible charting library for displaying various data representations.
+* **`chartjs-adapter-date-fns`**: Date adapter for Chart.js, enabling time-based scales.
+* **`regression`**: A JavaScript library for performing linear regression (used for price projections).
+* **`chartjs-plugin-zoom`**: A Chart.js plugin enabling interactive zoom and pan on charts.
+* **`react-router-dom`**: For client-side routing, managing navigation between different views (e.g., login, dashboard).
 
-### `npm run eject`
-
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
-
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+✉️ **Contact**
+For any questions or feedback, please reach out to: [Udish Kumar](https://www.linkedin.com/in/iudishkumar/)
