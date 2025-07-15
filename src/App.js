@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react'; // Import useRef for chart instance
 import axios from 'axios';
 import {
   AppBar,
@@ -17,16 +17,39 @@ import {
   Alert
 } from '@mui/material';
 import Autocomplete from '@mui/material/Autocomplete';
-import { Scatter, Line, Pie } from 'react-chartjs-2'; // Changed Bar to Pie
-import { Chart as ChartJS, Tooltip, Legend, PointElement, LinearScale, CategoryScale, TimeScale, LineElement, ArcElement } from 'chart.js'; // Changed BarElement to ArcElement
+import { Scatter, Line, Pie } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  Tooltip,
+  Legend,
+  PointElement,
+  LinearScale,
+  CategoryScale,
+  TimeScale,
+  LineElement,
+  ArcElement,
+} from 'chart.js';
+
+// Import and register chartjs-plugin-zoom
+import zoomPlugin from 'chartjs-plugin-zoom';
+
 import 'chartjs-adapter-date-fns';
 import regression from 'regression';
-// import AnnotationPlugin from 'chartjs-plugin-annotation'; // Uncomment if using annotations
+
 import './App.css';
 
-// Register required elements for Line, Scatter, and Pie charts
-ChartJS.register(Tooltip, Legend, PointElement, LinearScale, CategoryScale, TimeScale, LineElement, ArcElement); // Registered ArcElement for Pie charts
-// If using annotations, also register: ChartJS.register(AnnotationPlugin);
+// Register required elements for Line, Scatter, Pie charts, and the Zoom plugin
+ChartJS.register(
+  Tooltip,
+  Legend,
+  PointElement,
+  LinearScale,
+  CategoryScale,
+  TimeScale,
+  LineElement,
+  ArcElement,
+  zoomPlugin // Register the zoom plugin
+);
 
 function App() {
   const [articles, setArticles] = useState([]);
@@ -46,14 +69,21 @@ function App() {
   const [growthData, setGrowthData] = useState([]);
   const [projectedData, setProjectedData] = useState([]);
 
-  // New state for sentiment distribution, now structured by source
   const [sentimentDistribution, setSentimentDistribution] = useState({
     Reddit: {},
     NYTimes: {},
     Guardian: {}
   });
 
-  // Effect for debouncing the search term
+  // Ref for the sentiment chart instance to programmatically reset zoom
+  const sentimentChartRef = useRef(null);
+
+  // Helper function to add jitter to X-axis
+  const addJitter = (index) => {
+    // Add a small random value (e.g., between -0.5 and 0.5)
+    return index + (Math.random() - 0.5) * 5; // Adjust the multiplier (5) for more or less jitter
+  };
+
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearchTerm(searchTerm);
@@ -64,7 +94,6 @@ function App() {
     };
   }, [searchTerm]);
 
-  // Effect to filter articles and generate suggestions based on the debounced search term
   useEffect(() => {
     const updatedArticles = articles.filter(article =>
       article.title.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
@@ -95,7 +124,6 @@ function App() {
     }
   }, [debouncedSearchTerm, articles]);
 
-  // Effect to calculate sentiment distribution whenever articles change (UPDATED FOR PIE CHARTS)
   useEffect(() => {
     const newDistribution = {
       Reddit: {
@@ -119,7 +147,6 @@ function App() {
     setSentimentDistribution(newDistribution);
   }, [articles]);
 
-  // Initial data fetching and crypto growth data fetching
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -178,7 +205,6 @@ function App() {
     fetchGrowthData();
   }, [apiUrl]);
 
-  // Data for the Cryptocurrency Growth Chart
   const growthChartData = {
     labels: [
       ...growthData.map(data => data.date),
@@ -274,12 +300,11 @@ function App() {
     return articles.slice(startIndex, startIndex + ARTICLES_PER_PAGE);
   };
 
-  // Data for individual Pie Charts (NEW)
+  // Data for individual Pie Charts
   const createPieChartData = (sourceName) => {
     const dataForSource = sentimentDistribution[sourceName];
     const categories = ['Strongly Positive', 'Positive', 'Neutral', 'Negative', 'Strongly Negative'];
     const colors = categories.map(cat => {
-      // Use representative scores for color mapping
       if (cat === 'Strongly Positive') return getSentimentColor(15);
       if (cat === 'Positive') return getSentimentColor(5);
       if (cat === 'Neutral') return getSentimentColor(0);
@@ -307,7 +332,7 @@ function App() {
     plugins: {
       legend: {
         display: true,
-        position: 'right', // Positioning legend to the right
+        position: 'right',
         labels: {
           font: {
             size: 12,
@@ -335,58 +360,39 @@ function App() {
     },
   };
 
-
-  // Data for the Sentiment Analysis Chart (Updated with new color logic and point styling directly in datasets)
+  // Data for the Sentiment Analysis Chart (UPDATED FOR JITTER AND COLOR BY SENTIMENT)
   const sentimentData = {
-    labels: ['Sentiment Scores'],
     datasets: [
       {
-        label: 'Reddit',
-        data: articles.filter(a => a.source === 'reddit').map((article, index) => ({
-          x: index,
+        label: 'All Articles', // Single dataset for all articles
+        data: articles.map((article, index) => ({
+          x: addJitter(index), // Apply jitter to the x-axis
           y: article.sentiment,
-          label: article.title,
+          articleTitle: article.title, // Store full title for tooltip
+          source: article.source, // Store source for tooltip
         })),
-        pointBackgroundColor: (context) => getSentimentColor(context.raw.y),
+        pointBackgroundColor: (context) => getSentimentColor(context.raw.y), // Color by sentiment score
         pointRadius: 4,
         hoverRadius: 6,
-        borderColor: (context) => getSentimentColor(context.raw.y),
+        borderColor: (context) => getSentimentColor(context.raw.y), // Border color also by sentiment score
         borderWidth: 1,
+        // Using transparency to hint at density
+        pointBorderColor: 'rgba(255,255,255,0.6)', // White border for better separation
+        pointBorderWidth: 0.5,
+        // Optional: Reduce opacity slightly for more points
+        // pointBackgroundColor: (context) => {
+        //   const color = getSentimentColor(context.raw.y);
+        //   return color.replace('0.8', '0.6'); // Reduce alpha if desired
+        // },
       },
-      {
-        label: 'NYTimes',
-        data: articles.filter(a => a.source === 'nytimes').map((article, index) => ({
-          x: index,
-          y: article.sentiment,
-          label: article.title,
-        })),
-        pointBackgroundColor: (context) => getSentimentColor(context.raw.y),
-        pointRadius: 4,
-        hoverRadius: 6,
-        borderColor: (context) => getSentimentColor(context.raw.y),
-        borderWidth: 1,
-      },
-      {
-        label: 'The Guardian',
-        data: articles.filter(a => a.source === 'guardian').map((article, index) => ({
-          x: index,
-          y: article.sentiment,
-          label: article.title,
-        })),
-        pointBackgroundColor: (context) => getSentimentColor(context.raw.y),
-        pointRadius: 4,
-        hoverRadius: 6,
-        borderColor: (context) => getSentimentColor(context.raw.y),
-        borderWidth: 1,
-      }
     ],
   };
+
 
   // Options for the Sentiment Analysis Chart (Further improvised for analytical use)
   const sentimentOptions = {
     responsive: true,
     maintainAspectRatio: false,
-
     scales: {
       x: {
         beginAtZero: true,
@@ -430,28 +436,28 @@ function App() {
           },
           color: '#666',
         },
-        grid: {
+        grid: { // Enhanced gridlines for sentiment categories
           color: 'rgba(200, 200, 200, 0.2)',
           lineWidth: 1,
           drawOnChartArea: true,
           drawTicks: false,
           drawBorder: false,
-          lineWidth: function(context) {
+          lineWidth: function(context) { // Make specific gridlines thicker
             if (context.tick.value === 2 || context.tick.value === -2 || context.tick.value === 10 || context.tick.value === -10) {
-              return 2;
+              return 2; // Thicker lines for category boundaries
             }
             return 1;
           },
-          color: function(context) {
-            if (context.tick.value === 2 || context.tick.value === -2) return 'rgba(0, 0, 0, 0.5)';
-            if (context.tick.value === 10 || context.tick.value === -10) return 'rgba(0, 0, 0, 0.3)';
+          color: function(context) { // Color specific gridlines for visual cues
+            if (context.tick.value === 2 || context.tick.value === -2) return 'rgba(0, 0, 0, 0.5)'; // Neutral zone boundaries
+            if (context.tick.value === 10 || context.tick.value === -10) return 'rgba(0, 0, 0, 0.3)'; // Strong sentiment boundaries
             return 'rgba(200, 200, 200, 0.2)';
           },
         },
       },
     },
     plugins: {
-      legend: {
+      legend: { // Custom legend for sentiment categories (since dataset is 'All Articles')
         display: true,
         position: 'top',
         labels: {
@@ -460,17 +466,37 @@ function App() {
             weight: 'bold'
           },
           usePointStyle: true,
-          boxWidth: 10,
+          boxWidth: 20, // Make legend color boxes a bit wider
+          // Custom labels to represent sentiment categories and their colors
+          generateLabels: (chart) => {
+            const categories = ['Strongly Positive', 'Positive', 'Neutral', 'Negative', 'Strongly Negative'];
+            return categories.map((category) => {
+              let score;
+              if (category === 'Strongly Positive') score = 15;
+              else if (category === 'Positive') score = 5;
+              else if (category === 'Neutral') score = 0;
+              else if (category === 'Negative') score = -5;
+              else if (category === 'Strongly Negative') score = -15;
+              return {
+                text: category,
+                fillStyle: getSentimentColor(score),
+                strokeStyle: 'rgba(255,255,255,0.6)', // Match point border
+                lineWidth: 0.5,
+                hidden: false,
+                index: chart.data.datasets[0].data.findIndex(d => getSentimentCategory(d.y) === category), // Link to actual data if needed, or simply use unique index
+              };
+            });
+          },
         },
       },
       tooltip: {
         callbacks: {
           label: (tooltipItem) => {
-            const datasetLabel = tooltipItem.dataset.label || '';
-            const articleTitle = tooltipItem.raw.label;
+            const articleTitle = tooltipItem.raw.articleTitle;
             const sentimentScore = tooltipItem.raw.y;
             const sentimentCategory = getSentimentCategory(sentimentScore);
-            return `${datasetLabel}: ${articleTitle} (Score: ${sentimentScore.toFixed(2)}, Category: ${sentimentCategory})`;
+            const source = tooltipItem.raw.source; // Get source from raw data
+            return `Title: ${articleTitle}\nSource: ${source}\nScore: ${sentimentScore.toFixed(2)}\nCategory: ${sentimentCategory}`;
           }
         },
         backgroundColor: 'rgba(0, 0, 0, 0.8)',
@@ -478,38 +504,37 @@ function App() {
         bodyFont: { size: 12 },
         padding: 10,
         cornerRadius: 4,
-        displayColors: true,
+        displayColors: false, // Don't show color box for individual points in tooltip
       },
-      // annotation: { // Uncomment and install 'chartjs-plugin-annotation' to use
-      //   annotations: {
-      //     neutralZone: {
-      //       type: 'box',
-      //       yMin: -2,
-      //       yMax: 2,
-      //       backgroundColor: 'rgba(255, 165, 0, 0.1)',
-      //       borderColor: 'rgba(255, 165, 0, 0.2)',
-      //       borderWidth: 1,
-      //     },
-      //     positiveZone: {
-      //       type: 'box',
-      //       yMin: 2,
-      //       yMax: 20,
-      //       backgroundColor: 'rgba(60, 179, 113, 0.05)',
-      //       borderColor: 'rgba(60, 179, 113, 0.1)',
-      //       borderWidth: 1,
-      //     },
-      //     negativeZone: {
-      //       type: 'box',
-      //       yMin: -20,
-      //       yMax: -2,
-      //       backgroundColor: 'rgba(255, 99, 71, 0.05)',
-      //       borderColor: 'rgba(255, 99, 71, 0.1)',
-      //       borderWidth: 1,
-      //     }
-      //   }
-      // }
+      zoom: { // Zoom plugin configuration
+        zoom: {
+          wheel: {
+            enabled: true, // Enable zooming with mouse wheel
+          },
+          pinch: {
+            enabled: true // Enable pinch zooming on touch devices
+          },
+          mode: 'xy', // Enable zooming on both X and Y axes
+        },
+        pan: {
+          enabled: true, // Enable panning
+          mode: 'xy', // Enable panning on both X and Y axes
+        },
+        limits: { // Optional: Set limits for zooming/panning
+          x: { min: 0, max: articles.length * 1.1 }, // Adjust max based on potential jitter
+          y: { min: -25, max: 25 },
+        },
+      },
     },
   };
+
+  // Function to reset zoom (can be triggered by a button)
+  const resetZoom = () => {
+    if (sentimentChartRef.current) {
+      sentimentChartRef.current.resetZoom();
+    }
+  };
+
 
   return (
     <>
@@ -595,7 +620,7 @@ function App() {
               </Box>
             </Box>
 
-            {/* NEW: Individual Pie Charts for Sentiment Distribution */}
+            {/* Individual Pie Charts for Sentiment Distribution */}
             <Box sx={{ mb: 4 }}>
               <Typography variant="h5" gutterBottom>
                 Sentiment Distribution by Source 📊
@@ -617,7 +642,6 @@ function App() {
                 ))}
               </Grid>
             </Box>
-            {/* END NEW: Individual Pie Charts */}
 
             <Grid container spacing={4}>
               {['guardian', 'nytimes', 'reddit'].map((source) => (
@@ -696,14 +720,19 @@ function App() {
               ))}
             </Grid>
 
+            {/* Detailed Sentiment Chart (Scatter) with improvements */}
             <Box sx={{ mt: 4, mb: 4 }}>
               <Typography variant="h5" gutterBottom>
                 Detailed Sentiment Chart 📈 (Article-level)
+                {/* Optional: Add a button to reset zoom */}
+                <Button variant="outlined" onClick={resetZoom} sx={{ ml: 2, borderColor: '#1976d2', color: '#1976d2' }}>
+                    Reset Zoom
+                </Button>
               </Typography>
               <Card variant="outlined">
                 <CardContent>
                   <Box sx={{ height: 600 }}>
-                    <Scatter data={sentimentData} options={sentimentOptions} />
+                    <Scatter ref={sentimentChartRef} data={sentimentData} options={sentimentOptions} />
                   </Box>
                 </CardContent>
               </Card>
