@@ -230,9 +230,10 @@ function App() {
 
   // Function to get color based on sentiment score
   const getSentimentColor = (score) => {
-    if (score > 0) return `rgba(0, 255, 0, ${Math.min(score / 5, 1)})`; // Green for positive
-    if (score < 0) return `rgba(255, 0, 0, ${Math.min(Math.abs(score) / 5, 1)})`; // Red for negative
-    return 'rgba(255, 255, 0, 1)'; // Yellow for neutral
+    const opacity = Math.min(Math.abs(score) / 10, 1); // Normalize score to max 10 for opacity scale
+    if (score > 0) return `rgba(0, 150, 0, ${0.4 + opacity * 0.6})`; // Brighter green for stronger positive
+    if (score < 0) return `rgba(200, 0, 0, ${0.4 + opacity * 0.6})`; // Brighter red for stronger negative
+    return 'rgba(200, 200, 0, 0.7)'; // Slightly transparent yellow for neutral
   };
 
   // Helper function to paginate articles
@@ -250,52 +251,94 @@ function App() {
         data: articles.filter(a => a.source === 'reddit').map((article, index) => ({
           x: index,
           y: article.sentiment,
-          backgroundColor: getSentimentColor(article.sentiment),
-          label: article.title,
+          label: article.title, // Add title to data point for tooltip
         })),
         pointBackgroundColor: articles.filter(a => a.source === 'reddit').map(article => getSentimentColor(article.sentiment)),
-        pointRadius: 5,
+        pointRadius: 4, // Set a base radius here
+        hoverRadius: 6,
+        borderColor: (context) => getSentimentColor(context.raw.y).replace(/[^,]+(?=\))/, '0.8'), // Add border with slightly higher opacity
+        borderWidth: 1,
       },
       {
         label: 'NYTimes',
         data: articles.filter(a => a.source === 'nytimes').map((article, index) => ({
           x: index,
           y: article.sentiment,
-          backgroundColor: getSentimentColor(article.sentiment),
           label: article.title,
         })),
         pointBackgroundColor: articles.filter(a => a.source === 'nytimes').map(article => getSentimentColor(article.sentiment)),
-        pointRadius: 5,
+        pointRadius: 4,
+        hoverRadius: 6,
+        borderColor: (context) => getSentimentColor(context.raw.y).replace(/[^,]+(?=\))/, '0.8'),
+        borderWidth: 1,
       },
       {
         label: 'The Guardian',
         data: articles.filter(a => a.source === 'guardian').map((article, index) => ({
           x: index,
           y: article.sentiment,
-          backgroundColor: getSentimentColor(article.sentiment),
           label: article.title,
         })),
         pointBackgroundColor: articles.filter(a => a.source === 'guardian').map(article => getSentimentColor(article.sentiment)),
-        pointRadius: 5,
+        pointRadius: 4,
+        hoverRadius: 6,
+        borderColor: (context) => getSentimentColor(context.raw.y).replace(/[^,]+(?=\))/, '0.8'),
+        borderWidth: 1,
       }
     ],
   };
 
-  // Options for the Sentiment Analysis Chart (Kept as provided in your initial code)
+  // Options for the Sentiment Analysis Chart (IMPROVED)
   const sentimentOptions = {
+    responsive: true,
+    maintainAspectRatio: false, // Allows the chart to fill the container height
+
     scales: {
       x: {
         beginAtZero: true,
         title: {
           display: true,
           text: 'Article Index',
+          font: {
+            size: 14, // Increase title font size
+            weight: 'bold',
+          },
+          color: '#555', // Softer color for text
+        },
+        grid: {
+          color: 'rgba(200, 200, 200, 0.2)', // Lighter, subtle grid lines
+          lineWidth: 1,
+        },
+        ticks: {
+          font: {
+            size: 12, // Increase tick label font size
+          },
+          color: '#666',
         },
       },
       y: {
-        beginAtZero: true,
+        beginAtZero: false, // Keep false if sentiment can be negative
         title: {
           display: true,
           text: 'Sentiment Score',
+          font: {
+            size: 14, // Increase title font size
+            weight: 'bold',
+          },
+          color: '#555',
+        },
+        min: -15, // Adjusted example: Set a minimum sentiment score
+        max: 15,  // Adjusted example: Set a maximum sentiment score
+        ticks: {
+          stepSize: 5, // Show ticks every 5 units
+          font: {
+            size: 12, // Increase tick label font size
+          },
+          color: '#666',
+        },
+        grid: {
+          color: 'rgba(200, 200, 200, 0.2)', // Lighter, subtle grid lines
+          lineWidth: 1,
         },
       },
     },
@@ -303,21 +346,35 @@ function App() {
       legend: {
         display: true,
         position: 'top',
+        labels: {
+          font: {
+            size: 14, // Increase legend font size
+            weight: 'bold'
+          },
+          usePointStyle: true, // Use circle for legend markers
+          boxWidth: 10, // Adjust legend marker size
+        },
       },
       tooltip: {
         callbacks: {
           label: (tooltipItem) => {
-            const dataIndex = tooltipItem.dataIndex;
-            const dataset = tooltipItem.dataset;
-            const articleTitle = dataset.data[dataIndex].label;
-            const sentimentScore = dataset.data[dataIndex].y;
-            return `${articleTitle}: Sentiment Score ${sentimentScore}`;
+            const datasetLabel = tooltipItem.dataset.label || '';
+            const articleTitle = tooltipItem.raw.label; // Assuming `label` is the article title from your data mapping
+            const sentimentScore = tooltipItem.raw.y;
+            return `${datasetLabel}: ${articleTitle} (Score: ${sentimentScore.toFixed(2)})`;
           }
         },
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        titleFont: { size: 14, weight: 'bold' },
+        bodyFont: { size: 12 },
+        padding: 10,
+        cornerRadius: 4,
+        displayColors: true, // Show the color box in the tooltip
       },
     },
-    responsive: true,
-    maintainAspectRatio: false,
+    // You can remove the 'elements' block here if point styling is handled in datasets.
+    // However, if you want a global default for points, keep it.
+    // For this case, we've moved it to dataset definitions for more control.
   };
 
   return (
@@ -489,7 +546,8 @@ function App() {
               </Typography>
               <Card variant="outlined">
                 <CardContent>
-                  <Box sx={{ height: 500 }}>
+                  {/* Increased height for the sentiment chart */}
+                  <Box sx={{ height: 600 }}> {/* Changed from 500 to 600 */}
                     <Scatter data={sentimentData} options={sentimentOptions} />
                   </Box>
                 </CardContent>
