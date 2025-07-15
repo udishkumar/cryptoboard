@@ -17,15 +17,15 @@ import {
   Alert
 } from '@mui/material';
 import Autocomplete from '@mui/material/Autocomplete';
-import { Scatter, Line, Bar } from 'react-chartjs-2'; // Added Bar
-import { Chart as ChartJS, Tooltip, Legend, PointElement, LinearScale, CategoryScale, TimeScale, LineElement, BarElement } from 'chart.js'; // Added BarElement
+import { Scatter, Line, Pie } from 'react-chartjs-2'; // Changed Bar to Pie
+import { Chart as ChartJS, Tooltip, Legend, PointElement, LinearScale, CategoryScale, TimeScale, LineElement, ArcElement } from 'chart.js'; // Changed BarElement to ArcElement
 import 'chartjs-adapter-date-fns';
 import regression from 'regression';
 // import AnnotationPlugin from 'chartjs-plugin-annotation'; // Uncomment if using annotations
 import './App.css';
 
-// Register required elements for Line, Scatter, and Bar charts
-ChartJS.register(Tooltip, Legend, PointElement, LinearScale, CategoryScale, TimeScale, LineElement, BarElement);
+// Register required elements for Line, Scatter, and Pie charts
+ChartJS.register(Tooltip, Legend, PointElement, LinearScale, CategoryScale, TimeScale, LineElement, ArcElement); // Registered ArcElement for Pie charts
 // If using annotations, also register: ChartJS.register(AnnotationPlugin);
 
 function App() {
@@ -45,7 +45,13 @@ function App() {
   const apiUrl = process.env.REACT_APP_API_URL;
   const [growthData, setGrowthData] = useState([]);
   const [projectedData, setProjectedData] = useState([]);
-  const [sentimentDistribution, setSentimentDistribution] = useState({}); // New state for sentiment distribution
+
+  // New state for sentiment distribution, now structured by source
+  const [sentimentDistribution, setSentimentDistribution] = useState({
+    Reddit: {},
+    NYTimes: {},
+    Guardian: {}
+  });
 
   // Effect for debouncing the search term
   useEffect(() => {
@@ -89,24 +95,28 @@ function App() {
     }
   }, [debouncedSearchTerm, articles]);
 
-  // Effect to calculate sentiment distribution whenever articles change
+  // Effect to calculate sentiment distribution whenever articles change (UPDATED FOR PIE CHARTS)
   useEffect(() => {
-    const distribution = {
-      'Strongly Positive': { Reddit: 0, NYTimes: 0, Guardian: 0 },
-      'Positive': { Reddit: 0, NYTimes: 0, Guardian: 0 },
-      'Neutral': { Reddit: 0, NYTimes: 0, Guardian: 0 },
-      'Negative': { Reddit: 0, NYTimes: 0, Guardian: 0 },
-      'Strongly Negative': { Reddit: 0, NYTimes: 0, Guardian: 0 },
+    const newDistribution = {
+      Reddit: {
+        'Strongly Positive': 0, 'Positive': 0, 'Neutral': 0, 'Negative': 0, 'Strongly Negative': 0
+      },
+      NYTimes: {
+        'Strongly Positive': 0, 'Positive': 0, 'Neutral': 0, 'Negative': 0, 'Strongly Negative': 0
+      },
+      Guardian: {
+        'Strongly Positive': 0, 'Positive': 0, 'Neutral': 0, 'Negative': 0, 'Strongly Negative': 0
+      },
     };
 
     articles.forEach(article => {
       const category = getSentimentCategory(article.sentiment);
-      const source = article.source === 'guardian' ? 'Guardian' : article.source === 'nytimes' ? 'NYTimes' : 'Reddit';
-      if (distribution[category] && distribution[category][source] !== undefined) {
-        distribution[category][source]++;
+      const sourceKey = article.source === 'guardian' ? 'Guardian' : article.source === 'nytimes' ? 'NYTimes' : 'Reddit';
+      if (newDistribution[sourceKey] && newDistribution[sourceKey][category] !== undefined) {
+        newDistribution[sourceKey][category]++;
       }
     });
-    setSentimentDistribution(distribution);
+    setSentimentDistribution(newDistribution);
   }, [articles]);
 
   // Initial data fetching and crypto growth data fetching
@@ -264,108 +274,54 @@ function App() {
     return articles.slice(startIndex, startIndex + ARTICLES_PER_PAGE);
   };
 
-  // Data for the Sentiment Distribution Chart (NEW)
-  const sentimentDistributionData = {
-    labels: ['Reddit', 'NYTimes', 'The Guardian'],
-    datasets: [
-      {
-        label: 'Strongly Positive',
-        data: [
-          sentimentDistribution['Strongly Positive']?.Reddit || 0,
-          sentimentDistribution['Strongly Positive']?.NYTimes || 0,
-          sentimentDistribution['Strongly Positive']?.Guardian || 0,
-        ],
-        backgroundColor: getSentimentColor(15),
-      },
-      {
-        label: 'Positive',
-        data: [
-          sentimentDistribution['Positive']?.Reddit || 0,
-          sentimentDistribution['Positive']?.NYTimes || 0,
-          sentimentDistribution['Positive']?.Guardian || 0,
-        ],
-        backgroundColor: getSentimentColor(5),
-      },
-      {
-        label: 'Neutral',
-        data: [
-          sentimentDistribution['Neutral']?.Reddit || 0,
-          sentimentDistribution['Neutral']?.NYTimes || 0,
-          sentimentDistribution['Neutral']?.Guardian || 0,
-        ],
-        backgroundColor: getSentimentColor(0),
-      },
-      {
-        label: 'Negative',
-        data: [
-          sentimentDistribution['Negative']?.Reddit || 0,
-          sentimentDistribution['Negative']?.NYTimes || 0,
-          sentimentDistribution['Negative']?.Guardian || 0,
-        ],
-        backgroundColor: getSentimentColor(-5),
-      },
-      {
-        label: 'Strongly Negative',
-        data: [
-          sentimentDistribution['Strongly Negative']?.Reddit || 0,
-          sentimentDistribution['Strongly Negative']?.NYTimes || 0,
-          sentimentDistribution['Strongly Negative']?.Guardian || 0,
-        ],
-        backgroundColor: getSentimentColor(-15),
-      },
-    ],
+  // Data for individual Pie Charts (NEW)
+  const createPieChartData = (sourceName) => {
+    const dataForSource = sentimentDistribution[sourceName];
+    const categories = ['Strongly Positive', 'Positive', 'Neutral', 'Negative', 'Strongly Negative'];
+    const colors = categories.map(cat => {
+      // Use representative scores for color mapping
+      if (cat === 'Strongly Positive') return getSentimentColor(15);
+      if (cat === 'Positive') return getSentimentColor(5);
+      if (cat === 'Neutral') return getSentimentColor(0);
+      if (cat === 'Negative') return getSentimentColor(-5);
+      if (cat === 'Strongly Negative') return getSentimentColor(-15);
+      return 'rgba(150,150,150,0.8)';
+    });
+
+    return {
+      labels: categories,
+      datasets: [
+        {
+          data: categories.map(cat => dataForSource[cat] || 0),
+          backgroundColor: colors,
+          borderColor: 'white',
+          borderWidth: 2,
+        },
+      ],
+    };
   };
 
-  const sentimentDistributionOptions = {
+  const pieChartOptions = {
     responsive: true,
     maintainAspectRatio: false,
-    scales: {
-      x: {
-        stacked: true,
-        title: {
-          display: true,
-          text: 'News Source',
-          font: { size: 14, weight: 'bold' },
-          color: '#555',
-        },
-        ticks: {
-          font: { size: 12 },
-          color: '#666',
-        },
-      },
-      y: {
-        stacked: true,
-        beginAtZero: true,
-        title: {
-          display: true,
-          text: 'Number of Articles',
-          font: { size: 14, weight: 'bold' },
-          color: '#555',
-        },
-        ticks: {
-          font: { size: 12 },
-          color: '#666',
-        },
-      },
-    },
     plugins: {
       legend: {
         display: true,
-        position: 'top',
+        position: 'right', // Positioning legend to the right
         labels: {
-          font: { size: 14, weight: 'bold' },
+          font: {
+            size: 12,
+          },
           usePointStyle: true,
-          boxWidth: 10,
         },
       },
       tooltip: {
         callbacks: {
           label: (tooltipItem) => {
-            const label = tooltipItem.dataset.label;
+            const label = tooltipItem.label || '';
             const value = tooltipItem.raw;
-            const sourceIndex = tooltipItem.dataIndex;
-            const sourceTotal = sentimentDistributionData.datasets.reduce((sum, dataset) => sum + (dataset.data[sourceIndex] || 0), 0);
-            const percentage = sourceTotal > 0 ? ((value / sourceTotal) * 100).toFixed(1) : 0;
+            const total = tooltipItem.dataset.data.reduce((acc, val) => acc + val, 0);
+            const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
             return `${label}: ${value} articles (${percentage}%)`;
           },
         },
@@ -481,14 +437,12 @@ function App() {
           drawTicks: false,
           drawBorder: false,
           lineWidth: function(context) {
-            // Draw thicker lines at category boundaries
             if (context.tick.value === 2 || context.tick.value === -2 || context.tick.value === 10 || context.tick.value === -10) {
               return 2;
             }
             return 1;
           },
           color: function(context) {
-            // Use different colors for category boundary lines
             if (context.tick.value === 2 || context.tick.value === -2) return 'rgba(0, 0, 0, 0.5)';
             if (context.tick.value === 10 || context.tick.value === -10) return 'rgba(0, 0, 0, 0.3)';
             return 'rgba(200, 200, 200, 0.2)';
@@ -641,20 +595,29 @@ function App() {
               </Box>
             </Box>
 
-            {/* NEW Sentiment Distribution Chart */}
+            {/* NEW: Individual Pie Charts for Sentiment Distribution */}
             <Box sx={{ mb: 4 }}>
               <Typography variant="h5" gutterBottom>
                 Sentiment Distribution by Source 📊
               </Typography>
-              <Card variant="outlined">
-                <CardContent>
-                  <Box sx={{ height: 400 }}>
-                    <Bar data={sentimentDistributionData} options={sentimentDistributionOptions} />
-                  </Box>
-                </CardContent>
-              </Card>
+              <Grid container spacing={2}>
+                {['Reddit', 'NYTimes', 'Guardian'].map((source) => (
+                  <Grid item xs={12} md={4} key={source}>
+                    <Card variant="outlined">
+                      <CardContent>
+                        <Typography variant="h6" align="center" gutterBottom>
+                          {source}
+                        </Typography>
+                        <Box sx={{ height: 300, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                          <Pie data={createPieChartData(source)} options={pieChartOptions} />
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                ))}
+              </Grid>
             </Box>
-            {/* END NEW Sentiment Distribution Chart */}
+            {/* END NEW: Individual Pie Charts */}
 
             <Grid container spacing={4}>
               {['guardian', 'nytimes', 'reddit'].map((source) => (
@@ -733,7 +696,6 @@ function App() {
               ))}
             </Grid>
 
-            {/* IMPROVED Sentiment Scatter Chart */}
             <Box sx={{ mt: 4, mb: 4 }}>
               <Typography variant="h5" gutterBottom>
                 Detailed Sentiment Chart 📈 (Article-level)
@@ -746,7 +708,6 @@ function App() {
                 </CardContent>
               </Card>
             </Box>
-            {/* END IMPROVED Sentiment Scatter Chart */}
           </>
         )}
       </Container>
