@@ -16,13 +16,14 @@ import {
   CircularProgress,
   Alert
 } from '@mui/material';
+import Autocomplete from '@mui/material/Autocomplete'; // Import Autocomplete for autosuggestion
 import { Scatter, Line } from 'react-chartjs-2';
 import { Chart as ChartJS, Tooltip, Legend, PointElement, LinearScale, CategoryScale, TimeScale, LineElement } from 'chart.js';
 import 'chartjs-adapter-date-fns';
 import regression from 'regression';
 import './App.css';
 
-// Register required elements
+// Register required elements for Line and Scatter charts
 ChartJS.register(Tooltip, Legend, PointElement, LinearScale, CategoryScale, TimeScale, LineElement);
 
 function App() {
@@ -35,12 +36,65 @@ function App() {
   const [filteredArticles, setFilteredArticles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [suggestions, setSuggestions] = useState([]); // State for autosuggestions
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(''); // State for debounced search term
 
   const ARTICLES_PER_PAGE = 10;
   const apiUrl = process.env.REACT_APP_API_URL;
   const [growthData, setGrowthData] = useState([]);
   const [projectedData, setProjectedData] = useState([]);
 
+  // Effect for debouncing the search term
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 500); // 500ms debounce delay
+
+    // Cleanup function: Clear the timeout if searchTerm changes before the delay
+    // This prevents setDebouncedSearchTerm from being called for every keystroke.
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [searchTerm]); // Re-run this effect only when searchTerm changes
+
+  // Effect to filter articles and generate suggestions based on the debounced search term
+  useEffect(() => {
+    // Filter articles based on the debounced term
+    const updatedArticles = articles.filter(article =>
+      article.title.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
+    );
+    setFilteredArticles(updatedArticles);
+    // Reset pagination when the effective search term changes
+    setGuardianPage(1);
+    setNytimesPage(1);
+    setRedditPage(1);
+
+    // Generate suggestions from article titles (frontend approach)
+    if (debouncedSearchTerm.length > 2) { // Only suggest after 2 characters
+      const allTitles = articles.map(article => article.title);
+      const uniqueKeywords = new Set();
+
+      allTitles.forEach(title => {
+        // Simple tokenization: split by non-word characters
+        const words = title.toLowerCase().split(/\W+/).filter(word => word.length > 0);
+        words.forEach(word => {
+          if (word.startsWith(debouncedSearchTerm.toLowerCase())) {
+            uniqueKeywords.add(word);
+          }
+        });
+        // Also add the entire title if it starts with the debounced term
+        if (title.toLowerCase().startsWith(debouncedSearchTerm.toLowerCase())) {
+            uniqueKeywords.add(title);
+        }
+      });
+      // Convert Set to Array, sort alphabetically, and limit to 10 suggestions
+      setSuggestions(Array.from(uniqueKeywords).sort().slice(0, 10));
+    } else {
+      setSuggestions([]); // Clear suggestions if search term is too short
+    }
+  }, [debouncedSearchTerm, articles]); // Depend on debounced term and original articles
+
+  // Initial data fetching and crypto growth data fetching
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -48,7 +102,8 @@ function App() {
         const articlesRes = await axios.get(`${apiUrl}/articles`);
         const trendingRes = await axios.get(`${apiUrl}/trending`);
         setArticles(articlesRes.data);
-        setFilteredArticles(articlesRes.data);
+        // Initial filtering is now handled by the debouncedSearchTerm effect,
+        // which will run once `articles` is set.
         setTrendingTopics(trendingRes.data);
       } catch (err) {
         setError("Failed to fetch articles or trending topics.");
@@ -100,6 +155,7 @@ function App() {
     fetchGrowthData();
   }, [apiUrl]);
 
+  // Data for the Cryptocurrency Growth Chart
   const growthChartData = {
     labels: [
       ...growthData.map(data => data.date),
@@ -149,26 +205,15 @@ function App() {
     maintainAspectRatio: false,
   };
 
-  const handleSearchChange = (event) => {
-    setSearchTerm(event.target.value);
-    const updatedArticles = articles.filter(article =>
-      article.title.toLowerCase().includes(event.target.value.toLowerCase())
-    );
-    setFilteredArticles(updatedArticles);
-    setGuardianPage(1);
-    setNytimesPage(1);
-    setRedditPage(1);
+  // handleSearchChange now updates searchTerm, debouncing handles filtering
+  const handleSearchChange = (event, newValue) => {
+    // newValue is for Autocomplete's onChange (selection), event.target.value for onInputChange (typing)
+    setSearchTerm(newValue || event.target.value || '');
   };
 
   const handleTrendingClick = (topic) => {
     setSearchTerm(topic.keyword);
-    const updatedArticles = articles.filter(article =>
-      article.title.toLowerCase().includes(topic.keyword.toLowerCase())
-    );
-    setFilteredArticles(updatedArticles);
-    setGuardianPage(1);
-    setNytimesPage(1);
-    setRedditPage(1);
+    // Filtering will automatically happen via the debouncedSearchTerm effect
   };
 
   const handleGuardianPageChange = (event, value) => {
@@ -183,70 +228,132 @@ function App() {
     setRedditPage(value);
   };
 
+  // Function to get color based on sentiment score
   const getSentimentColor = (score) => {
     if (score > 0) return `rgba(0, 255, 0, ${Math.min(score / 5, 1)})`; // Green for positive
     if (score < 0) return `rgba(255, 0, 0, ${Math.min(Math.abs(score) / 5, 1)})`; // Red for negative
     return 'rgba(255, 255, 0, 1)'; // Yellow for neutral
   };
 
+  // Helper function to paginate articles
   const paginateArticles = (articles, page) => {
     const startIndex = (page - 1) * ARTICLES_PER_PAGE;
     return articles.slice(startIndex, startIndex + ARTICLES_PER_PAGE);
   };
 
+  // Helper function to calculate average sentiment for a source
+  const averageSentiment = (articles, source) => {
+    const sourceArticles = articles.filter(a => a.source === source);
+    if (sourceArticles.length === 0) return 0;
+    const sum = sourceArticles.reduce((acc, article) => acc + article.sentiment, 0);
+    return sum / sourceArticles.length;
+  };
+
+  // Data for the Sentiment Analysis Chart (Improved Scatter Plot)
   const sentimentData = {
-    labels: ['Sentiment Scores'],
     datasets: [
       {
-        label: 'Reddit',
-        data: articles.filter(a => a.source === 'reddit').map((article, index) => ({
-          x: index,
-          y: article.sentiment,
+        label: 'Reddit Articles',
+        data: articles.filter(a => a.source === 'reddit').map((article) => ({
+          x: article.sentiment,
+          y: 'Reddit', // Fixed Y-axis label for the source
           backgroundColor: getSentimentColor(article.sentiment),
-          label: article.title,
+          label: article.title, // Article title for tooltip
         })),
         pointBackgroundColor: articles.filter(a => a.source === 'reddit').map(article => getSentimentColor(article.sentiment)),
-        pointRadius: 5,
+        pointRadius: 6, // Slightly larger points for visibility
       },
       {
-        label: 'NYTimes',
-        data: articles.filter(a => a.source === 'nytimes').map((article, index) => ({
-          x: index,
-          y: article.sentiment,
+        label: 'NYTimes Articles',
+        data: articles.filter(a => a.source === 'nytimes').map((article) => ({
+          x: article.sentiment,
+          y: 'NYTimes', // Fixed Y-axis label for the source
           backgroundColor: getSentimentColor(article.sentiment),
           label: article.title,
         })),
         pointBackgroundColor: articles.filter(a => a.source === 'nytimes').map(article => getSentimentColor(article.sentiment)),
-        pointRadius: 5,
+        pointRadius: 6,
       },
       {
-        label: 'The Guardian',
-        data: articles.filter(a => a.source === 'guardian').map((article, index) => ({
-          x: index,
-          y: article.sentiment,
+        label: 'The Guardian Articles',
+        data: articles.filter(a => a.source === 'guardian').map((article) => ({
+          x: article.sentiment,
+          y: 'The Guardian', // Fixed Y-axis label for the source
           backgroundColor: getSentimentColor(article.sentiment),
           label: article.title,
         })),
         pointBackgroundColor: articles.filter(a => a.source === 'guardian').map(article => getSentimentColor(article.sentiment)),
-        pointRadius: 5,
-      }
+        pointRadius: 6,
+      },
+      // Datasets for Average sentiment lines (type: 'line' within a scatter chart)
+      {
+        label: 'Reddit Avg. Sentiment',
+        data: [{ x: averageSentiment(articles, 'reddit'), y: 'Reddit' }], // Single point for the line
+        type: 'line', // This dataset will be rendered as a line
+        borderColor: 'rgba(0, 0, 0, 0.7)', // Darker line for average
+        borderWidth: 2,
+        pointRadius: 0, // Hide points on the line
+        fill: false,
+        tooltipHidden: true, // Custom property to hide tooltip for this line
+      },
+      {
+        label: 'NYTimes Avg. Sentiment',
+        data: [{ x: averageSentiment(articles, 'nytimes'), y: 'NYTimes' }],
+        type: 'line',
+        borderColor: 'rgba(0, 0, 0, 0.7)',
+        borderWidth: 2,
+        pointRadius: 0,
+        fill: false,
+        tooltipHidden: true,
+      },
+      {
+        label: 'The Guardian Avg. Sentiment',
+        data: [{ x: averageSentiment(articles, 'guardian'), y: 'The Guardian' }],
+        type: 'line',
+        borderColor: 'rgba(0, 0, 0, 0.7)',
+        borderWidth: 2,
+        pointRadius: 0,
+        fill: false,
+        tooltipHidden: true,
+      },
     ],
   };
 
+  // Options for the Sentiment Analysis Chart
   const sentimentOptions = {
     scales: {
       x: {
-        beginAtZero: true,
+        type: 'linear', // Linear scale for sentiment scores
+        position: 'bottom',
+        min: -1, // Sentiment score range from -1 to +1
+        max: 1,
         title: {
           display: true,
-          text: 'Article Index',
+          text: 'Sentiment Score (-1 Negative, 0 Neutral, +1 Positive)',
         },
+        grid: {
+          drawOnChartArea: true, // Keep grid lines
+          color: (context) => {
+            if (context.tick.value === 0) {
+              return 'rgba(0, 0, 0, 0.5)'; // Darker line at 0 for neutral
+            }
+            return 'rgba(0, 0, 0, 0.1)'; // Lighter grid lines
+          }
+        },
+        ticks: {
+            stepSize: 0.2 // Show ticks every 0.2 units
+        }
       },
       y: {
-        beginAtZero: true,
+        type: 'category', // Category scale for news source labels
+        labels: ['Reddit', 'NYTimes', 'The Guardian'], // Explicitly define the order of categories
+        offset: true, // Centers the categories on their respective "tracks"
         title: {
           display: true,
-          text: 'Sentiment Score',
+          text: 'News Source',
+        },
+        grid: {
+          display: false, // Hide horizontal grid lines for cleaner look
         },
       },
     },
@@ -254,15 +361,27 @@ function App() {
       legend: {
         display: true,
         position: 'top',
+        labels: {
+          filter: function (legendItem, chartData) {
+            // Only show labels for scatter datasets (hide line datasets by checking custom property)
+            return !chartData.datasets[legendItem.datasetIndex].tooltipHidden;
+          }
+        }
       },
       tooltip: {
         callbacks: {
           label: (tooltipItem) => {
-            const dataIndex = tooltipItem.dataIndex;
-            const dataset = tooltipItem.dataset;
-            const articleTitle = dataset.data[dataIndex].label;
-            const sentimentScore = dataset.data[dataIndex].y;
-            return `${articleTitle}: Sentiment Score ${sentimentScore}`;
+            // Check if the dataset has the custom tooltipHidden property
+            if (tooltipItem.dataset.tooltipHidden) {
+                return null; // Hide tooltip for average lines
+            }
+            const articleTitle = tooltipItem.raw.label; // Get article title from raw data
+            const sentimentScore = tooltipItem.raw.x; // Get sentiment score from raw data
+            return `${articleTitle}: Sentiment Score ${sentimentScore.toFixed(2)}`; // Format score
+          },
+          title: (tooltipItems) => {
+            // Show source as title for points
+            return tooltipItems[0].raw.y;
           }
         },
       },
@@ -296,13 +415,26 @@ function App() {
               <Typography variant="h5" gutterBottom>
                 Search Articles 🔍
               </Typography>
-              <TextField
-                fullWidth
-                label="Enter keywords"
-                variant="outlined"
-                value={searchTerm}
-                onChange={handleSearchChange}
-                aria-label="Search Articles"
+              <Autocomplete
+                freeSolo // Allows typing arbitrary values not in suggestions
+                options={suggestions} // Array of suggestion strings
+                value={searchTerm} // Controlled component value
+                onInputChange={handleSearchChange} // Updates searchTerm as user types
+                onChange={(event, newValue) => { // Handles selection from suggestions or pressing enter
+                  setSearchTerm(newValue || ''); // Set search term to selected suggestion or empty string
+                  // The debouncedSearchTerm effect will handle filtering
+                }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params} // Spreads props like label, value, onChange, etc.
+                    fullWidth
+                    label="Enter keywords"
+                    variant="outlined"
+                    aria-label="Search Articles"
+                  />
+                )}
+                // Apply existing TextField styling to the Autocomplete's input
+                sx={{ '& .MuiOutlinedInput-root': { borderRadius: '8px', backgroundColor: '#fdfdfd' } }}
               />
             </Box>
 
@@ -423,12 +555,15 @@ function App() {
 
             <Box sx={{ mt: 4, mb: 4 }}>
               <Typography variant="h5" gutterBottom>
-                Sentiment Chart 📊
+                Sentiment Analysis by Source 📊
               </Typography>
               <Card variant="outlined">
                 <CardContent>
                   <Box sx={{ height: 500 }}>
-                    <Scatter data={sentimentData} options={sentimentOptions} />
+                    <Scatter
+                      data={sentimentData}
+                      options={sentimentOptions}
+                    />
                   </Box>
                 </CardContent>
               </Card>
