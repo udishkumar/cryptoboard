@@ -94,6 +94,7 @@ function App() {
     }
   }, [debouncedSearchTerm, articles]); // Depend on debounced term and original articles
 
+
   // Initial data fetching and crypto growth data fetching
   useEffect(() => {
     const fetchData = async () => {
@@ -102,8 +103,7 @@ function App() {
         const articlesRes = await axios.get(`${apiUrl}/articles`);
         const trendingRes = await axios.get(`${apiUrl}/trending`);
         setArticles(articlesRes.data);
-        // Initial filtering is now handled by the debouncedSearchTerm effect,
-        // which will run once `articles` is set.
+        // Initial filtering will be handled by the debouncedSearchTerm effect once `articles` is set
         setTrendingTopics(trendingRes.data);
       } catch (err) {
         setError("Failed to fetch articles or trending topics.");
@@ -241,119 +241,61 @@ function App() {
     return articles.slice(startIndex, startIndex + ARTICLES_PER_PAGE);
   };
 
-  // Helper function to calculate average sentiment for a source
-  const averageSentiment = (articles, source) => {
-    const sourceArticles = articles.filter(a => a.source === source);
-    if (sourceArticles.length === 0) return 0;
-    const sum = sourceArticles.reduce((acc, article) => acc + article.sentiment, 0);
-    return sum / sourceArticles.length;
-  };
-
-  // Data for the Sentiment Analysis Chart (Improved Scatter Plot)
+  // Data for the Sentiment Analysis Chart (Kept as provided in your initial code)
   const sentimentData = {
+    labels: ['Sentiment Scores'],
     datasets: [
       {
-        label: 'Reddit Articles',
-        data: articles.filter(a => a.source === 'reddit').map((article) => ({
-          x: article.sentiment,
-          y: 'Reddit', // Fixed Y-axis label for the source
+        label: 'Reddit',
+        data: articles.filter(a => a.source === 'reddit').map((article, index) => ({
+          x: index,
+          y: article.sentiment,
           backgroundColor: getSentimentColor(article.sentiment),
-          label: article.title, // Article title for tooltip
+          label: article.title,
         })),
         pointBackgroundColor: articles.filter(a => a.source === 'reddit').map(article => getSentimentColor(article.sentiment)),
-        pointRadius: 6, // Slightly larger points for visibility
+        pointRadius: 5,
       },
       {
-        label: 'NYTimes Articles',
-        data: articles.filter(a => a.source === 'nytimes').map((article) => ({
-          x: article.sentiment,
-          y: 'NYTimes', // Fixed Y-axis label for the source
+        label: 'NYTimes',
+        data: articles.filter(a => a.source === 'nytimes').map((article, index) => ({
+          x: index,
+          y: article.sentiment,
           backgroundColor: getSentimentColor(article.sentiment),
           label: article.title,
         })),
         pointBackgroundColor: articles.filter(a => a.source === 'nytimes').map(article => getSentimentColor(article.sentiment)),
-        pointRadius: 6,
+        pointRadius: 5,
       },
       {
-        label: 'The Guardian Articles',
-        data: articles.filter(a => a.source === 'guardian').map((article) => ({
-          x: article.sentiment,
-          y: 'The Guardian', // Fixed Y-axis label for the source
+        label: 'The Guardian',
+        data: articles.filter(a => a.source === 'guardian').map((article, index) => ({
+          x: index,
+          y: article.sentiment,
           backgroundColor: getSentimentColor(article.sentiment),
           label: article.title,
         })),
         pointBackgroundColor: articles.filter(a => a.source === 'guardian').map(article => getSentimentColor(article.sentiment)),
-        pointRadius: 6,
-      },
-      // Datasets for Average sentiment lines (type: 'line' within a scatter chart)
-      {
-        label: 'Reddit Avg. Sentiment',
-        data: [{ x: averageSentiment(articles, 'reddit'), y: 'Reddit' }], // Single point for the line
-        type: 'line', // This dataset will be rendered as a line
-        borderColor: 'rgba(0, 0, 0, 0.7)', // Darker line for average
-        borderWidth: 2,
-        pointRadius: 0, // Hide points on the line
-        fill: false,
-        tooltipHidden: true, // Custom property to hide tooltip for this line
-      },
-      {
-        label: 'NYTimes Avg. Sentiment',
-        data: [{ x: averageSentiment(articles, 'nytimes'), y: 'NYTimes' }],
-        type: 'line',
-        borderColor: 'rgba(0, 0, 0, 0.7)',
-        borderWidth: 2,
-        pointRadius: 0,
-        fill: false,
-        tooltipHidden: true,
-      },
-      {
-        label: 'The Guardian Avg. Sentiment',
-        data: [{ x: averageSentiment(articles, 'guardian'), y: 'The Guardian' }],
-        type: 'line',
-        borderColor: 'rgba(0, 0, 0, 0.7)',
-        borderWidth: 2,
-        pointRadius: 0,
-        fill: false,
-        tooltipHidden: true,
-      },
+        pointRadius: 5,
+      }
     ],
   };
 
-  // Options for the Sentiment Analysis Chart
+  // Options for the Sentiment Analysis Chart (Kept as provided in your initial code)
   const sentimentOptions = {
     scales: {
       x: {
-        type: 'linear', // Linear scale for sentiment scores
-        position: 'bottom',
-        min: -1, // Sentiment score range from -1 to +1
-        max: 1,
+        beginAtZero: true,
         title: {
           display: true,
-          text: 'Sentiment Score (-1 Negative, 0 Neutral, +1 Positive)',
+          text: 'Article Index',
         },
-        grid: {
-          drawOnChartArea: true, // Keep grid lines
-          color: (context) => {
-            if (context.tick.value === 0) {
-              return 'rgba(0, 0, 0, 0.5)'; // Darker line at 0 for neutral
-            }
-            return 'rgba(0, 0, 0, 0.1)'; // Lighter grid lines
-          }
-        },
-        ticks: {
-            stepSize: 0.2 // Show ticks every 0.2 units
-        }
       },
       y: {
-        type: 'category', // Category scale for news source labels
-        labels: ['Reddit', 'NYTimes', 'The Guardian'], // Explicitly define the order of categories
-        offset: true, // Centers the categories on their respective "tracks"
+        beginAtZero: true,
         title: {
           display: true,
-          text: 'News Source',
-        },
-        grid: {
-          display: false, // Hide horizontal grid lines for cleaner look
+          text: 'Sentiment Score',
         },
       },
     },
@@ -361,27 +303,15 @@ function App() {
       legend: {
         display: true,
         position: 'top',
-        labels: {
-          filter: function (legendItem, chartData) {
-            // Only show labels for scatter datasets (hide line datasets by checking custom property)
-            return !chartData.datasets[legendItem.datasetIndex].tooltipHidden;
-          }
-        }
       },
       tooltip: {
         callbacks: {
           label: (tooltipItem) => {
-            // Check if the dataset has the custom tooltipHidden property
-            if (tooltipItem.dataset.tooltipHidden) {
-                return null; // Hide tooltip for average lines
-            }
-            const articleTitle = tooltipItem.raw.label; // Get article title from raw data
-            const sentimentScore = tooltipItem.raw.x; // Get sentiment score from raw data
-            return `${articleTitle}: Sentiment Score ${sentimentScore.toFixed(2)}`; // Format score
-          },
-          title: (tooltipItems) => {
-            // Show source as title for points
-            return tooltipItems[0].raw.y;
+            const dataIndex = tooltipItem.dataIndex;
+            const dataset = tooltipItem.dataset;
+            const articleTitle = dataset.data[dataIndex].label;
+            const sentimentScore = dataset.data[dataIndex].y;
+            return `${articleTitle}: Sentiment Score ${sentimentScore}`;
           }
         },
       },
@@ -555,15 +485,12 @@ function App() {
 
             <Box sx={{ mt: 4, mb: 4 }}>
               <Typography variant="h5" gutterBottom>
-                Sentiment Analysis by Source 📊
+                Sentiment Chart 📊
               </Typography>
               <Card variant="outlined">
                 <CardContent>
                   <Box sx={{ height: 500 }}>
-                    <Scatter
-                      data={sentimentData}
-                      options={sentimentOptions}
-                    />
+                    <Scatter data={sentimentData} options={sentimentOptions} />
                   </Box>
                 </CardContent>
               </Card>
