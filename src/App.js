@@ -14,7 +14,8 @@ import {
   Pagination,
   Box,
   CircularProgress,
-  Alert
+  Alert,
+  Button // <--- Make sure Button is imported for the Reset Zoom button
 } from '@mui/material';
 import Autocomplete from '@mui/material/Autocomplete';
 import { Scatter, Line, Pie } from 'react-chartjs-2';
@@ -81,7 +82,8 @@ function App() {
   // Helper function to add jitter to X-axis
   const addJitter = (index) => {
     // Add a small random value (e.g., between -0.5 and 0.5)
-    return index + (Math.random() - 0.5) * 5; // Adjust the multiplier (5) for more or less jitter
+    // Adjust the multiplier (5) for more or less jitter based on data density
+    return index + (Math.random() - 0.5) * 5;
   };
 
   useEffect(() => {
@@ -274,7 +276,7 @@ function App() {
     setRedditPage(value);
   };
 
-  // Function to get color based on sentiment score (IMPROVED FOR CATEGORIES)
+  // Function to get color based on sentiment score
   const getSentimentColor = (score) => {
     if (score >= 10) return 'rgba(0, 128, 0, 0.8)'; // Darker Green for Strongly Positive
     if (score > 2) return 'rgba(60, 179, 113, 0.8)'; // Medium Green for Positive
@@ -284,7 +286,7 @@ function App() {
     return 'rgba(150, 150, 150, 0.8)'; // Default/Grey for undefined
   };
 
-  // Function to get sentiment category (NEW)
+  // Function to get sentiment category
   const getSentimentCategory = (score) => {
     if (score >= 10) return 'Strongly Positive';
     if (score > 2) return 'Positive';
@@ -305,6 +307,7 @@ function App() {
     const dataForSource = sentimentDistribution[sourceName];
     const categories = ['Strongly Positive', 'Positive', 'Neutral', 'Negative', 'Strongly Negative'];
     const colors = categories.map(cat => {
+      // Use representative scores for color mapping
       if (cat === 'Strongly Positive') return getSentimentColor(15);
       if (cat === 'Positive') return getSentimentColor(5);
       if (cat === 'Neutral') return getSentimentColor(0);
@@ -360,36 +363,62 @@ function App() {
     },
   };
 
-  // Data for the Sentiment Analysis Chart (UPDATED FOR JITTER AND COLOR BY SENTIMENT)
+  // Data for the Sentiment Analysis Chart (UPDATED WITH JITTER AND TOOLTIP DATA)
   const sentimentData = {
+    labels: ['Sentiment Scores'], // This label is often not directly used in scatter charts with multiple datasets
     datasets: [
       {
-        label: 'All Articles', // Single dataset for all articles
-        data: articles.map((article, index) => ({
-          x: addJitter(index), // Apply jitter to the x-axis
+        label: 'Reddit',
+        data: articles.filter(a => a.source === 'reddit').map((article, index) => ({
+          x: addJitter(index), // Apply jitter
           y: article.sentiment,
-          articleTitle: article.title, // Store full title for tooltip
-          source: article.source, // Store source for tooltip
+          articleTitle: article.title, // Add for tooltip
+          source: 'Reddit', // Add for tooltip
         })),
         pointBackgroundColor: (context) => getSentimentColor(context.raw.y), // Color by sentiment score
         pointRadius: 4,
         hoverRadius: 6,
-        borderColor: (context) => getSentimentColor(context.raw.y), // Border color also by sentiment score
+        borderColor: (context) => getSentimentColor(context.raw.y),
         borderWidth: 1,
-        // Using transparency to hint at density
         pointBorderColor: 'rgba(255,255,255,0.6)', // White border for better separation
         pointBorderWidth: 0.5,
-        // Optional: Reduce opacity slightly for more points
-        // pointBackgroundColor: (context) => {
-        //   const color = getSentimentColor(context.raw.y);
-        //   return color.replace('0.8', '0.6'); // Reduce alpha if desired
-        // },
       },
+      {
+        label: 'NYTimes',
+        data: articles.filter(a => a.source === 'nytimes').map((article, index) => ({
+          x: addJitter(index), // Apply jitter
+          y: article.sentiment,
+          articleTitle: article.title, // Add for tooltip
+          source: 'NYTimes', // Add for tooltip
+        })),
+        pointBackgroundColor: (context) => getSentimentColor(context.raw.y),
+        pointRadius: 4,
+        hoverRadius: 6,
+        borderColor: (context) => getSentimentColor(context.raw.y),
+        borderWidth: 1,
+        pointBorderColor: 'rgba(255,255,255,0.6)',
+        pointBorderWidth: 0.5,
+      },
+      {
+        label: 'The Guardian',
+        data: articles.filter(a => a.source === 'guardian').map((article, index) => ({
+          x: addJitter(index), // Apply jitter
+          y: article.sentiment,
+          articleTitle: article.title, // Add for tooltip
+          source: 'The Guardian', // Add for tooltip
+        })),
+        pointBackgroundColor: (context) => getSentimentColor(context.raw.y),
+        pointRadius: 4,
+        hoverRadius: 6,
+        borderColor: (context) => getSentimentColor(context.raw.y),
+        borderWidth: 1,
+        pointBorderColor: 'rgba(255,255,255,0.6)',
+        pointBorderWidth: 0.5,
+      }
     ],
   };
 
-
-  // Options for the Sentiment Analysis Chart (Further improvised for analytical use)
+  // Options for the Sentiment Analysis Chart (UPDATED FOR ZOOM AND TOOLTIP)
   const sentimentOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -436,19 +465,19 @@ function App() {
           },
           color: '#666',
         },
-        grid: { // Enhanced gridlines for sentiment categories
+        grid: {
           color: 'rgba(200, 200, 200, 0.2)',
           lineWidth: 1,
           drawOnChartArea: true,
           drawTicks: false,
           drawBorder: false,
-          lineWidth: function(context) { // Make specific gridlines thicker
+          lineWidth: function(context) {
             if (context.tick.value === 2 || context.tick.value === -2 || context.tick.value === 10 || context.tick.value === -10) {
               return 2; // Thicker lines for category boundaries
             }
             return 1;
           },
-          color: function(context) { // Color specific gridlines for visual cues
+          color: function(context) {
             if (context.tick.value === 2 || context.tick.value === -2) return 'rgba(0, 0, 0, 0.5)'; // Neutral zone boundaries
             if (context.tick.value === 10 || context.tick.value === -10) return 'rgba(0, 0, 0, 0.3)'; // Strong sentiment boundaries
             return 'rgba(200, 200, 200, 0.2)';
@@ -457,7 +486,7 @@ function App() {
       },
     },
     plugins: {
-      legend: { // Custom legend for sentiment categories (since dataset is 'All Articles')
+      legend: {
         display: true,
         position: 'top',
         labels: {
@@ -466,36 +495,17 @@ function App() {
             weight: 'bold'
           },
           usePointStyle: true,
-          boxWidth: 20, // Make legend color boxes a bit wider
-          // Custom labels to represent sentiment categories and their colors
-          generateLabels: (chart) => {
-            const categories = ['Strongly Positive', 'Positive', 'Neutral', 'Negative', 'Strongly Negative'];
-            return categories.map((category) => {
-              let score;
-              if (category === 'Strongly Positive') score = 15;
-              else if (category === 'Positive') score = 5;
-              else if (category === 'Neutral') score = 0;
-              else if (category === 'Negative') score = -5;
-              else if (category === 'Strongly Negative') score = -15;
-              return {
-                text: category,
-                fillStyle: getSentimentColor(score),
-                strokeStyle: 'rgba(255,255,255,0.6)', // Match point border
-                lineWidth: 0.5,
-                hidden: false,
-                index: chart.data.datasets[0].data.findIndex(d => getSentimentCategory(d.y) === category), // Link to actual data if needed, or simply use unique index
-              };
-            });
-          },
+          boxWidth: 10,
         },
       },
       tooltip: {
         callbacks: {
           label: (tooltipItem) => {
+            // Access properties from raw data (which includes articleTitle and source)
             const articleTitle = tooltipItem.raw.articleTitle;
             const sentimentScore = tooltipItem.raw.y;
             const sentimentCategory = getSentimentCategory(sentimentScore);
-            const source = tooltipItem.raw.source; // Get source from raw data
+            const source = tooltipItem.raw.source; // Retrieve source from raw data
             return `Title: ${articleTitle}\nSource: ${source}\nScore: ${sentimentScore.toFixed(2)}\nCategory: ${sentimentCategory}`;
           }
         },
@@ -504,12 +514,13 @@ function App() {
         bodyFont: { size: 12 },
         padding: 10,
         cornerRadius: 4,
-        displayColors: false, // Don't show color box for individual points in tooltip
+        displayColors: false, // Set to false because colors are based on sentiment, not dataset label color
       },
       zoom: { // Zoom plugin configuration
         zoom: {
           wheel: {
             enabled: true, // Enable zooming with mouse wheel
+            // modifierKey: 'ctrl', // Optional: require CTRL key for zoom (Mac: Cmd)
           },
           pinch: {
             enabled: true // Enable pinch zooming on touch devices
@@ -519,13 +530,43 @@ function App() {
         pan: {
           enabled: true, // Enable panning
           mode: 'xy', // Enable panning on both X and Y axes
+          // modifierKey: 'alt', // Optional: require ALT key for pan
         },
         limits: { // Optional: Set limits for zooming/panning
-          x: { min: 0, max: articles.length * 1.1 }, // Adjust max based on potential jitter
+          // Setting x limits based on actual data length + some buffer for jitter
+          x: { min: -50, max: articles.length + 50 },
           y: { min: -25, max: 25 },
         },
       },
     },
+    // annotation: { // Uncomment and install 'chartjs-plugin-annotation' to use
+    //   annotations: {
+    //     neutralZone: {
+    //       type: 'box',
+    //       yMin: -2,
+    //       yMax: 2,
+    //       backgroundColor: 'rgba(255, 165, 0, 0.1)',
+    //       borderColor: 'rgba(255, 165, 0, 0.2)',
+    //       borderWidth: 1,
+    //     },
+    //     positiveZone: {
+    //       type: 'box',
+    //       yMin: 2,
+    //       yMax: 20,
+    //       backgroundColor: 'rgba(60, 179, 113, 0.05)',
+    //       borderColor: 'rgba(60, 179, 113, 0.1)',
+    //       borderWidth: 1,
+    //     },
+    //     negativeZone: {
+    //       type: 'box',
+    //       yMin: -20,
+    //       yMax: -2,
+    //       backgroundColor: 'rgba(255, 99, 71, 0.05)',
+    //       borderColor: 'rgba(255, 99, 71, 0.1)',
+    //       borderWidth: 1,
+    //     }
+    //   }
+    // }
   };
 
   // Function to reset zoom (can be triggered by a button)
@@ -732,6 +773,7 @@ function App() {
               <Card variant="outlined">
                 <CardContent>
                   <Box sx={{ height: 600 }}>
+                    {/* Attach the ref to the Scatter component */}
                     <Scatter ref={sentimentChartRef} data={sentimentData} options={sentimentOptions} />
                   </Box>
                 </CardContent>
